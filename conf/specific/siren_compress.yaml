@@ -1,0 +1,26 @@
+# @package _global_
+wandb_project: "meeting 3 6k steps"
+
+mlp:
+  activation: siren
+  first_omega_0: 50
+  hidden_omega_0: 30 # ${mlp.first_omega_0}
+  hidden_size: 256
+  depth: 4
+
+train:
+  downsample: 1
+  batch_height: 512
+  batch_width: 1024
+  stochastic: True
+  num_steps: 6000
+
+encoding:
+  func: siren
+  map_type: none
+  map_size: 2
+  num_func: 1
+  map_scale: 0.0
+
+
+exp_name: siren

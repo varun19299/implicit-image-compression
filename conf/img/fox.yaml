@@ -1,0 +1,7 @@
+# @package img
+path: ${hydra:runtime.cwd}/img/fox.jpg
+height: 512
+width: 512
+plot: False
+crop_mode: "centre-crop"
+save_gt: False

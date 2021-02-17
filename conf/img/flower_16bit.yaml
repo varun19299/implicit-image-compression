@@ -1,0 +1,8 @@
+# @package img
+path: ${hydra:runtime.cwd}/img/rgb16bit/flower_foveon.ppm
+height: 1024
+width: 1024
+plot: False
+crop_mode: "resize-crop"
+save_gt: False
+bits: 16

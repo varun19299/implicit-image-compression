@@ -1,0 +1,17 @@
+# @package _group_
+# Hydra configs
+hydra:
+  run:
+    dir: ./outputs/${exp_name}/${hydra.job.override_dirname}
+  sweep:
+    dir: ./outputs/${exp_name}/
+    subdir: ${hydra.job.override_dirname}
+  job_logging:
+    root:
+      handlers:
+        - file
+  job:
+    config:
+      override_dirname:
+        exclude_keys:
+          - exp_name

@@ -1,0 +1,12 @@
+outputs/*
+wandb_api.key
+__pycache__/*
+*/__pycache__/*
+*idea*
+.vscode/*
+
+# DIV2K images are too big
+img/rgb*/*
+
+Icon*
+*.pth

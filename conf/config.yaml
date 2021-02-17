@@ -1,0 +1,31 @@
+defaults:
+  - img: fox
+  - hydra
+  - override hydra/launcher: joblib
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+exp_name: image_fitting
+seed: 0
+device: cuda # cpu or cuda
+
+
+train:
+  log_iters: 100
+  num_steps: 2000
+  batch_height: ${img.height}
+  batch_width: ${img.width}
+  save_weights: False
+
+mlp:
+  depth: 4
+  first_omega_0: 50
+  hidden_omega_0: 30 # ${mlp.first_omega_0}
+  hidden_size: 256
+
+wandb:
+  use: True
+  project: "implicit image compression"
+  api_key: ${hydra:runtime.cwd}/wandb_api.key
+
+
