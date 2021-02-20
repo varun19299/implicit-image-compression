@@ -1,4 +1,4 @@
-"""Some helper functions for FeatherMap1, including:
+"""Some helper functions for FeatherMap, including:
     - progress_bar: mimics xlua.progress.
     - timed: decorator for timing functions
     - get_block_rows: Get complete rows from range within matrix
@@ -33,7 +33,7 @@ def progress_bar(current, total, msg=None):
         sys.stdout.write("=")
     sys.stdout.write(">")
     for i in range(rest_len):
-        sys.stdout.write("")
+        sys.stdout.write(".")
     sys.stdout.write("]")
 
     cur_time = time.time()

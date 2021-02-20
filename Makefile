@@ -12,7 +12,7 @@ SEED := 0
 
 ## install: install all dependencies
 install:
-	pip install -r requirements.txt --upgrade
+	pip install -r requirements.txt
 
 help : Makefile
     ifeq ($(UNAME_S),Linux)
@@ -26,4 +26,14 @@ help : Makefile
         endif
     endif
 
-all:
+# Config defaults
+DEVICE := cpu
+EXP_NAME := flower_16bit
+
+## fit: Implicit MLP image fitting
+fit:
+	${PYTHON} main.py \
+ 	exp_name=$(EXP_NAME) \
+ 	device=$(DEVICE) $(KWARGS) $(HYDRA_FLAGS)
+
+all: fit

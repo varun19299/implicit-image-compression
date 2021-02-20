@@ -1,7 +1,7 @@
 defaults:
-  - img: fox
+  - img: flower_16bit
   - hydra
-  - override hydra/launcher: joblib
+  - override hydra/launcher: basic_launcher
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
 
@@ -12,20 +12,25 @@ device: cuda # cpu or cuda
 
 train:
   log_iters: 100
+  learning_rate: 1e-4
   num_steps: 2000
   batch_height: ${img.height}
   batch_width: ${img.width}
   save_weights: False
 
 mlp:
-  depth: 4
+  depth: 8
   first_omega_0: 50
   hidden_omega_0: 30 # ${mlp.first_omega_0}
   hidden_size: 256
+  outermost_linear: True
+  simulate_quantization: False
 
 wandb:
   use: True
-  project: "implicit image compression"
+  entity: implicit-image
+  project: siren-basic
   api_key: ${hydra:runtime.cwd}/wandb_api.key
+  name: ${exp_name}
 
 

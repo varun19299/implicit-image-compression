@@ -16,3 +16,7 @@ We hydra for configs. YAML files present under `conf/`.
 ## Main Script
 
 `make fit`
+
+## MakeFile Help
+
+`make help`, will display commented usage for each command.

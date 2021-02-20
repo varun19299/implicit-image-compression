@@ -1,2 +1,4 @@
-# @package hydra.launcher
+defaults:
+  - override /hydra/launcher@._global_: basic
+
 _target_: hydra._internal.core_plugins.basic_launcher.BasicLauncher

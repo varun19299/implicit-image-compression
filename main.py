@@ -6,6 +6,8 @@ import os
 from omegaconf import DictConfig, OmegaConf
 from pathlib import Path
 
+from feathermap.feathernet import FeatherNet
+
 # Torch imports
 import torch
 import torch.nn.functional as F
@@ -41,7 +43,7 @@ def main(cfg: DictConfig):
 
     # Slice loaders
     train_loader, test_loader = get_dataloaders(
-        img, cfg.train.batch_height, cfg.train.batch_width, cfg.train.downsample
+        img, cfg.train.batch_height, cfg.train.batch_width
     )
 
     # Construct composed (Siren or MLP)
@@ -49,6 +51,7 @@ def main(cfg: DictConfig):
     logging.info(f"Encoded grid of shape {grid.shape}")
 
     model = Siren(**cfg.mlp)
+    # model = FeatherNet(model, compress=0.5)
 
     # Send to device
     model = model.to(device)
@@ -56,14 +59,15 @@ def main(cfg: DictConfig):
     img = img.to(device)
 
     # wandb
-    if cfg.use_wandb:
-        with open(cfg.wandb_api_key) as f:
+    if cfg.wandb.use:
+        with open(cfg.wandb.api_key) as f:
             os.environ["WANDB_API_KEY"] = f.read()
 
         wandb.init(
+            entity=cfg.wandb.entity,
             config=OmegaConf.to_container(cfg, resolve=True),
-            project=cfg.wandb_project,
-            name=cfg.exp_name,
+            project=cfg.wandb.project,
+            name=cfg.wandb.name,
             reinit=True,
             save_code=True,
         )
@@ -71,17 +75,17 @@ def main(cfg: DictConfig):
 
     # Train
     model.train()
-    optim = torch.optim.Adam(model.parameters(), lr=1e-4)
+    optim = torch.optim.Adam(model.parameters(), lr=cfg.train.learning_rate)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optim, eta_min=1e-5, T_max=cfg.train.num_steps, last_epoch=-1
     )
 
     # tqdm
     pbar = tqdm(total=cfg.train.num_steps, dynamic_ncols=True)
+    iters = len(train_loader)
 
-    i = 0
-    while i < cfg.train.num_steps:
-        for h_batch, w_batch in train_loader:
+    for i in range(cfg.train.num_steps):
+        for e, (h_batch, w_batch) in enumerate(train_loader):
             model.zero_grad()
             optim.zero_grad()
 
@@ -102,68 +106,62 @@ def main(cfg: DictConfig):
             train_loss.backward()
 
             optim.step()
-            lr_scheduler.step()
-
-            # Increment train step
-            i += 1
+            lr_scheduler.step(i + e / iters)
 
             # Update pbar
             pbar.update(1)
 
-            if (i + 1) % cfg.train.log_iters == 0:
-                with torch.no_grad():
-                    y_pred_full = torch.zeros_like(img)
+        if (i + 1) % cfg.train.log_iters == 0:
+            with torch.no_grad():
+                y_pred_full = torch.zeros_like(img)
 
-                    for h_batch, w_batch in test_loader:
-                        x_test = grid[
-                            h_batch,
-                            w_batch,
-                        ]
-                        y_pred = model(x_test)
-                        y_pred_full[
-                            h_batch,
-                            w_batch,
-                        ] = y_pred
+                for h_batch, w_batch in test_loader:
+                    x_test = grid[
+                        h_batch,
+                        w_batch,
+                    ]
+                    y_pred = model(x_test)
+                    y_pred_full[
+                        h_batch,
+                        w_batch,
+                    ] = y_pred
 
-                    test_loss = F.mse_loss(y_pred_full, img)
+                test_loss = F.mse_loss(y_pred_full, img)
 
-                    test_PSNR = 10 * torch.log10(1 / test_loss)
+                test_PSNR = 10 * torch.log10(1 / test_loss)
 
-                    # pbar update
-                    msg = f"Step: {i + 1} | Train loss: {train_loss:.4f} | Test loss: {test_loss:.4f} | Test PSNR: {test_PSNR:.3f}"
+                # pbar update
+                msg = f"Step: {i + 1} | Train loss: {train_loss:.4f} | Test loss: {test_loss:.4f} | Test PSNR: {test_PSNR:.3f}"
 
-                    pbar.set_description(msg)
-                    logging.info(msg)
+                pbar.set_description(msg)
+                logging.info(msg)
 
-                    if cfg.use_wandb:
-                        # W&B logs
-                        img_name = Path(cfg.img.path).name
-                        _log_dict = {
-                            "train_loss": train_loss,
-                            "test_loss": test_loss,
-                            "test_PSNR": test_PSNR,
-                            "image": [
-                                wandb.Image(
-                                    y_pred_full.permute(2, 0, 1).detach(),
-                                    caption=img_name,
-                                )
-                            ],
-                        }
-                        wandb.log(_log_dict, step=i + 1)
+                if cfg.wandb.use:
+                    # W&B logs
+                    img_name = Path(cfg.img.path).name
+                    _log_dict = {
+                        "train_loss": train_loss,
+                        "test_loss": test_loss,
+                        "test_PSNR": test_PSNR,
+                        "image": [
+                            wandb.Image(
+                                y_pred_full.permute(2, 0, 1).detach(),
+                                caption=img_name,
+                            )
+                        ],
+                    }
+                    wandb.log(_log_dict, step=i + 1)
 
     # Save weights
     if cfg.train.save_weights:
         state = {
             "state_dict": compress_indices(model.state_dict()),
-            "optimizer": optim.state_dict(),
-            "train_loss": train_loss,
-            "test_loss": test_loss,
         }
         torch.save(state, "model.pth")
 
-        if cfg.use_wandb:
-            # Close wandb context
-            wandb.join()
+    # Close wandb context
+    if cfg.wandb.use:
+        wandb.join()
 
     return test_PSNR.item()
 

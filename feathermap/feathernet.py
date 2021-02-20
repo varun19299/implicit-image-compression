@@ -140,7 +140,6 @@ class FeatherNet(nn.Module):
     an overview of structured mutli-hashing.
     """
 
-
     def __init__(
         self,
         module: nn.Module,
@@ -223,14 +222,18 @@ class FeatherNet(nn.Module):
                 data = module._parameters[kind].data
                 if kind == "weight":
                     fan_in = torch.nn.init._calculate_correct_fan(data, "fan_in")
-                # get bias fan_in from corresponding weight
                 else:
+                    # get bias fan_in from corresponding weight
                     fan_in = torch.nn.init._calculate_correct_fan(
                         getattr(module, "weight"), "fan_in"
                     )
                 # Delete from parameter list to avoid loading into state dict
                 del module._parameters[kind]
-                scaler = 1 / sqrt(3 * fan_in)
+
+                scaler = 1 / sqrt(fan_in)
+                if hasattr(module, "scaler"):
+                    scaler = module.scaler
+
                 setattr(module, kind, data)
                 # Add scale parameter to each weight or bias
                 module.register_parameter(
@@ -281,6 +284,10 @@ class FeatherNet(nn.Module):
         intializations"""
         # sigma = M**(-1/4); bound follows from uniform dist.
         bound = sqrt(12) / 2 * (self._size_m ** (-1 / 4))
+
+        # sqrt(12)/2 comes from:
+        # Var(Uni(a,b)) = (b-a)^2/12
+        # Std(Uni(-a,a))= 2a/\sqrt(12)
         torch.nn.init.uniform_(self._V1, -bound, bound)
         torch.nn.init.uniform_(self._V2, -bound, bound)
 
@@ -379,8 +386,6 @@ class FeatherNet(nn.Module):
 
 
 def tests():
-    from feathermap.models.resnet import ResNet34, ResNet18
-
     # Device configuration
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -393,28 +398,8 @@ def tests():
         flmodel.__WandBtoV()
         [print(name, v) for name, v in flmodel.named_parameters()]
 
-    def res_test():
-        def pic_gen():
-            for i in range(2):
-                yield torch.randn([1, 3, 32, 32])
-        base_model = ResNet34().to(device)
-        model = FeatherNet(base_model, compress=1.0, verbose=True).to(device)
-        for name, module, kind in model._get_WandB_modules():
-            p = getattr(module, kind)
-            print(name, kind, p.size(), p.numel())
-        with torch.no_grad():
-            for x in pic_gen():
-                model(x)
-        model.deploy()
-        with torch.no_grad():
-            for x in pic_gen():
-                model(x)
-
-    res_test()
+    linear_test
 
 
 if __name__ == "__main__":
-    try:
-        tests()
-    except KeyboardInterrupt:
-        exit()
+    tests()

@@ -28,10 +28,10 @@ class SliceDataset(Dataset):
         return h_idx, w_idx
 
 
-def get_dataloaders(img: torch.Tensor, batch_height, batch_width, downsample: int = 1):
+def get_dataloaders(img: torch.Tensor, batch_height, batch_width):
     h, w, _ = img.shape
     train_loader = DataLoader(
-        SliceDataset(h // downsample, w // downsample),
+        SliceDataset(h, w),
         batch_size=batch_height * batch_width,
         shuffle=True,
     )
@@ -64,13 +64,13 @@ def load_img(
 
     if crop_mode == "resize-crop":
         # Resize such that shorter side matches corresponding target side
-        resize_ratio = min(height, width) / min(img.shape[:2])
+        smaller_side = min(height, width)
         img = kornia.resize(
-            img.unsqueeze(0), resize_ratio, align_corners=False
+            img.unsqueeze(0), smaller_side, align_corners=False
         ).squeeze(0)
 
-    img = kornia.center_crop(img, (height, width), align_corners=False)
-    img = img.permute(1, 2, 0)
+    img = kornia.center_crop(img.unsqueeze(0), (height, width), align_corners=False)
+    img = img.squeeze(0).permute(1, 2, 0)
 
     if plot:
         plt.imshow(img)
