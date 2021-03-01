@@ -1,0 +1,6 @@
+# @package mlp
+name: fourier
+depth: 8
+hidden_size: 256
+map_size: 256 # ${mlp.first_omega_0}
+map_scale: 32

@@ -1,6 +1,7 @@
 defaults:
   - img: flower_16bit
   - hydra
+  - mlp: siren
   - override hydra/launcher: basic_launcher
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
@@ -17,14 +18,7 @@ train:
   batch_height: ${img.height}
   batch_width: ${img.width}
   save_weights: False
-
-mlp:
-  depth: 8
-  first_omega_0: 50
-  hidden_omega_0: 30 # ${mlp.first_omega_0}
-  hidden_size: 256
-  outermost_linear: True
-  simulate_quantization: False
+  multiplier: 1
 
 wandb:
   use: True
@@ -32,5 +26,3 @@ wandb:
   project: siren-basic
   api_key: ${hydra:runtime.cwd}/wandb_api.key
   name: ${exp_name}
-
-

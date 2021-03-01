@@ -59,7 +59,9 @@ class SineLayer(nn.Module):
     def forward(self, x: torch.Tensor):
         if self.simulate_quantization:
             x = self.quant(x)
+
         x = self.linear(x) * self.omega_0
+
         if self.simulate_quantization:
             x = self.dequant(x)
         if not self.no_activation:
@@ -70,14 +72,15 @@ class SineLayer(nn.Module):
 class Siren(nn.Module):
     def __init__(
         self,
-        depth: int = 8,
         input_size: int = 2,
         output_size: int = 3,
+        depth: int = 8,
         hidden_size: int = 256,
         first_omega_0: float = 30.0,
         hidden_omega_0: float = 30.0,
         outermost_linear: bool = True,
         simulate_quantization: bool = False,
+        **kwargs
     ):
         super().__init__()
 

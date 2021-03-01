@@ -1,7 +1,7 @@
 # @package img
 path: ${hydra:runtime.cwd}/img/rgb16bit/big_building.ppm
-height: 1024
-width: 1024
+height: 512
+width: 512
 plot: False
 crop_mode: "resize-crop"
 save_gt: False

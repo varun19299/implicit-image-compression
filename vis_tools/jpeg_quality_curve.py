@@ -17,9 +17,13 @@ from hurry.filesize import size as hurry_size
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
 
-    img_names = ["big_building.ppm", "flower_foveon.ppm"]
+    img_names = ["flower_foveon.ppm"]
     img_dict = {}
     quality_ll = list(range(10, 101, 10))
+
+    # Initialize directories
+    path = Path(f"{hydra.utils.get_original_cwd()}/outputs/plots/")
+    path.mkdir(exist_ok=True, parents=True)
 
     for img_name in img_names:
         single_cfg = cfg.copy()
@@ -63,11 +67,11 @@ def main(cfg: DictConfig):
         plt.plot(quality_ll, img_dict[img_name]["psnr"], linestyle="--", marker="o")
 
     plt.xlabel("Quality")
-    plt.ylabel("PSNR")
+    plt.ylabel("PSNR (in dB)")
     plt.title("JPEG Quality vs PSNR")
     plt.legend(img_dict.keys())
     plt.savefig(
-        f"{hydra.utils.get_original_cwd()}/vis_dump/meeting_3/jpeg_psnr_vs_quality.png",
+        path / "jpeg_psnr_vs_quality.png",
         dpi=150,
     )
     plt.show()
@@ -79,7 +83,24 @@ def main(cfg: DictConfig):
     plt.title("JPEG Quality vs Size")
     plt.legend(img_dict.keys())
     plt.savefig(
-        f"{hydra.utils.get_original_cwd()}/vis_dump/meeting_3/jpeg_size_vs_quality.png",
+        path / "jpeg_size_vs_quality.png",
+        dpi=150,
+    )
+    plt.show()
+
+    for img_name in img_dict:
+        plt.plot(
+            img_dict[img_name]["size"],
+            img_dict[img_name]["psnr"],
+            linestyle="--",
+            marker="o",
+        )
+    plt.xlabel("Size (in KB)")
+    plt.ylabel("PSNR (in dB)")
+    plt.title("JPEG Quality vs Size")
+    plt.legend(img_dict.keys())
+    plt.savefig(
+        path / "jpeg_psnr_vs_size.png",
         dpi=150,
     )
     plt.show()
