@@ -44,7 +44,7 @@ We can't run our codebase directly on colab, since hydra relies on config inject
 Instead, we'll make use of [colabcode](https://github.com/abhishekkrthakur/colabcode/blob/master/colab_starter.ipynb). 
 Just click the button below, and setup your port and password.
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/googlecolab/varun19299/implicit-image-compression/blob/master/colab_starter.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/googlecolab/varun19299/implicit-image-compression/blob/main/colab_starter.ipynb)
 
 This should open up a familiar VSCode environment, use the terminal to run.
 
