@@ -2,7 +2,7 @@
 name: Pruning
 density: 1.0  # The density of the overall sparse network.
 sparse_init: random
-final_density: 0.2
+final_density: 0.5
 dense_gradients: True
 
 growth_mode: none  # Growth mode. Choose from: momentum, random, and momentum_neuron.
@@ -12,8 +12,8 @@ dense: False  # Enable dense mode. Default: False.
 
 decay_schedule: magnitude-prune  # The decay schedule for the pruning rate. Default: cosine. Choose from: cosine, linear
 apply_when: step_end  # or step_end
-start_when: 700 # training steps
-end_when: 65918 # Epochs / Training Step till which mask updates are applied (set to 75% total steps)
-interval: 100 # Which epochs or steps to apply at
+start_when: 5 # training steps
+end_when: 1500 # Epochs / Training Step till which mask updates are applied (set to 75% total steps)
+interval: 10 # Which epochs or steps to apply at
 
 print_FLOPs: True

@@ -6,6 +6,10 @@ import os
 from omegaconf import DictConfig, OmegaConf
 from pathlib import Path
 
+# Dynamic Sparsity
+from sparselearning.core import Masking
+from sparselearning.funcs.decay import registry as decay_registry
+
 from feathermap.feathernet import FeatherNet
 
 # Torch imports
@@ -13,6 +17,7 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
+from models import registry as model_registry
 from utils.catch_error import catch_error_decorator
 from utils.train_utils import (
     load_img,
@@ -50,7 +55,7 @@ def main(cfg: DictConfig):
     _, _, c = grid.shape
     logging.info(f"Encoded grid of shape {grid.shape}")
 
-    model = Siren(**cfg.mlp)
+    model = model_registry[cfg.mlp.name](**cfg.mlp)
     # model = FeatherNet(model, compress=0.5)
 
     # Send to device
@@ -73,12 +78,51 @@ def main(cfg: DictConfig):
         )
         wandb.watch(model)
 
+    # Training multiplier
+    training_multiplier = cfg.train.multiplier
+    cfg.train.num_steps *= training_multiplier
+
+    if cfg.get("masking"):
+        cfg.masking.end_when *= training_multiplier
+        cfg.masking.end_when = int(cfg.masking.end_when)
+
+        cfg.masking.interval *= training_multiplier
+        cfg.masking.interval = int(cfg.masking.interval)
+
     # Train
     model.train()
     optim = torch.optim.Adam(model.parameters(), lr=cfg.train.learning_rate)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optim, eta_min=1e-5, T_max=cfg.train.num_steps, last_epoch=-1
     )
+
+    # Setup mask
+    mask = None
+    if cfg.get("masking"):
+        if cfg.masking.decay_schedule == "magnitude-prune":
+            kwargs = {
+                "final_sparsity": 1 - cfg.masking.final_density,
+                "T_max": cfg.masking.end_when,
+                "T_start": cfg.masking.start_when,
+                "interval": cfg.masking.interval,
+            }
+        else:
+            kwargs = {"prune_rate": cfg.masking.prune_rate, "T_max": cfg.masking.end_when}
+
+        decay = decay_registry[cfg.masking.decay_schedule](**kwargs)
+
+        mask = Masking(
+            optim,
+            decay,
+            input_size=(1,2),
+            density=cfg.masking.density,
+            dense_gradients=cfg.masking.dense_gradients,
+            sparse_init=cfg.masking.sparse_init,
+            prune_mode=cfg.masking.prune_mode,
+            growth_mode=cfg.masking.growth_mode,
+            redistribution_mode=cfg.masking.redistribution_mode,
+        )
+        mask.add_module(model)
 
     # tqdm
     pbar = tqdm(total=cfg.train.num_steps, dynamic_ncols=True)
@@ -105,11 +149,17 @@ def main(cfg: DictConfig):
             )
             train_loss.backward()
 
-            optim.step()
+            stepper = mask if mask else optim
+            stepper.step()
             lr_scheduler.step(i + e / iters)
 
             # Update pbar
             pbar.update(1)
+
+        # Apply mask
+        if mask and i <= cfg.masking.end_when:
+            if i % cfg.masking.interval == 0:
+                mask.update_connections()
 
         if (i + 1) % cfg.train.log_iters == 0:
             with torch.no_grad():
@@ -133,6 +183,8 @@ def main(cfg: DictConfig):
                 # pbar update
                 msg = f"Step: {i + 1} | Train loss: {train_loss:.4f} | Test loss: {test_loss:.4f} | Test PSNR: {test_PSNR:.3f}"
 
+                if mask:
+                    msg += f" | Mask Prune Rate {mask.prune_rate:.5f}"
                 pbar.set_description(msg)
                 logging.info(msg)
 
@@ -150,6 +202,12 @@ def main(cfg: DictConfig):
                             )
                         ],
                     }
+                    if mask:
+                        _log_dict = {
+                            **_log_dict,
+                            "prune_rate": mask.prune_rate,
+                            "density": mask.stats.total_density,
+                        }
                     wandb.log(_log_dict, step=i + 1)
 
     # Save weights

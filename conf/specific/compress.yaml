@@ -1,7 +1,0 @@
-# @package _global_
-train:
-  downsample: 1
-  batch_height: 512
-  batch_width: 512
-  stochastic: True
-  num_steps: 6000
