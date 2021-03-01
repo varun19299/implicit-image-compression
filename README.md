@@ -39,6 +39,29 @@ Look out for top-tier conference papers (CVPR, ECCV, ICCV, NeurIPS, ICLR) and jo
 
 <details><summary><b>Using Colab</b></summary>
 <p>
+
+We can't run our codebase directly on colab, since hydra relies on config injection.
+Instead, we'll make use of [colabcode](https://github.com/abhishekkrthakur/colabcode/blob/master/colab_starter.ipynb). 
+Just click the button below, and setup your port and password.
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/googlecolab/varun19299/implicit-image-compression/blob/master/colab_starter.ipynb)
+
+This should open up a familiar VSCode environment, use the terminal to run.
+
+Steps:
+
+* Change to your drive home folder.
+File -> Open -> `/content/drive/MyDrive/`.
+
+* Clone repository (only the first time):
+`git clone https://github.com/varun19299/implicit-image-compression.git`.
+
+* Copy the `img/` folder from the shared drive here.
+
+* Install all dependencies with: `make colab_install` 
+
+**Please do not use the shared folder as the location for your code, it will cause conflicts.**
+
 </p>
 </details>
 

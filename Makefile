@@ -14,6 +14,13 @@ SEED := 0
 install:
 	pip install -r requirements.txt
 
+setup_zsh:
+	@apt-get install -y zsh tree htop vim
+	@echo "Yes" | sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+	@source ~/.zshrc
+
+colab_install: setup_zsh install
+
 help : Makefile
     ifeq ($(UNAME_S),Linux)
 		@sed -ns -e '$$a\\' -e 's/^##//p' $^
