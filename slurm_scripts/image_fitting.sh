@@ -9,8 +9,7 @@
 #SBATCH --cpus-per-task=4       # cpu-cores per task (>1 if multi-threaded tasks)
 #SBATCH --mem-per-cpu=4G         # memory per cpu-core
 #SBATCH --time=23:59:00          # total run time limit (HH:MM:SS)
-#SBATCH --gres=gpu:gtx1080:1     # GPU needed
-#SBATCH --array=0-1
+#SBATCH --gres=gpu:gtx1080:1     # GPU needed ##SBATCH --array=0-1
 
 # Mailing stuff
 #SBATCH --mail-type=BEGIN,END,FAIL
@@ -29,7 +28,7 @@ nvidia-smi
 # Conda stuff
 module load cuda/10.2 anaconda/wml
 source ~/.zshrc
-conda activate torch38
+conda activate torch1.7_py38
 
 # NVIDIA SMI monitoring
 if [ $SLURM_ARRAY_TASK_ID -eq 0 ]; then
@@ -41,6 +40,6 @@ if [ $SLURM_ARRAY_TASK_ID -eq 0 ]; then
 fi
 
 # Start Job here
-make fit
+python main.py +masking=SNFS masking.density=${1} exp_name='${masking.name}_${masking.density}_trainx_${train.multiplier}' train.multiplier=5 --cfg job
 
 wait
