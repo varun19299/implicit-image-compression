@@ -1,32 +1,23 @@
-# Libraries
-import hydra
+# Standard Libraries
 import logging
-from models.siren import Siren
 import os
-from omegaconf import DictConfig, OmegaConf
 from pathlib import Path
 
-# Dynamic Sparsity
-from sparselearning.core import Masking
-from sparselearning.funcs.decay import registry as decay_registry
-
-from feathermap.feathernet import FeatherNet
+# Other 3rd party imports
+import hydra
+import wandb
+from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
 
 # Torch imports
 import torch
 import torch.nn.functional as F
-from tqdm import tqdm
 
+# Modules
 from models import registry as model_registry
 from utils.catch_error import catch_error_decorator
-from utils.train_utils import (
-    load_img,
-    compress_indices,
-    get_dataloaders,
-    get_device,
-    get_grid,
-)
-import wandb
+from utils.data import get_dataloaders, load_img, get_grid
+from utils.train_helper import eval_epoch, get_device, setup_mask, train_epoch
 
 
 @catch_error_decorator
@@ -47,16 +38,15 @@ def main(cfg: DictConfig):
     grid = get_grid(cfg.img.height, cfg.img.width)
 
     # Slice loaders
-    train_loader, test_loader = get_dataloaders(
+    train_loader, eval_loader = get_dataloaders(
         img, cfg.train.batch_height, cfg.train.batch_width
     )
 
     # Construct composed (Siren or MLP)
     _, _, c = grid.shape
-    logging.info(f"Encoded grid of shape {grid.shape}")
+    logging.info(f"Grid of shape {grid.shape}")
 
     model = model_registry[cfg.mlp.name](**cfg.mlp)
-    # model = FeatherNet(model, compress=0.5)
 
     # Send to device
     model = model.to(device)
@@ -96,124 +86,77 @@ def main(cfg: DictConfig):
         optim, eta_min=1e-5, T_max=cfg.train.num_steps, last_epoch=-1
     )
 
-    # Setup mask
-    mask = None
-    if cfg.get("masking"):
-        if cfg.masking.decay_schedule == "magnitude-prune":
-            kwargs = {
-                "final_sparsity": 1 - cfg.masking.final_density,
-                "T_max": cfg.masking.end_when,
-                "T_start": cfg.masking.start_when,
-                "interval": cfg.masking.interval,
-            }
-        else:
-            kwargs = {"prune_rate": cfg.masking.prune_rate, "T_max": cfg.masking.end_when}
-
-        decay = decay_registry[cfg.masking.decay_schedule](**kwargs)
-
-        mask = Masking(
-            optim,
-            decay,
-            input_size=(1,2),
-            density=cfg.masking.density,
-            dense_gradients=cfg.masking.dense_gradients,
-            sparse_init=cfg.masking.sparse_init,
-            prune_mode=cfg.masking.prune_mode,
-            growth_mode=cfg.masking.growth_mode,
-            redistribution_mode=cfg.masking.redistribution_mode,
-        )
-        mask.add_module(model)
+    # Setup mask if cfg.masking != {}
+    mask = setup_mask(model, optim, cfg.get("masking"))
 
     # tqdm
     pbar = tqdm(total=cfg.train.num_steps, dynamic_ncols=True)
-    iters = len(train_loader)
 
     for i in range(cfg.train.num_steps):
-        for e, (h_batch, w_batch) in enumerate(train_loader):
-            model.zero_grad()
-            optim.zero_grad()
-
-            x_train = grid[
-                h_batch,
-                w_batch,
-            ]
-            y_train = img[
-                h_batch,
-                w_batch,
-            ]
-            y_pred = model(x_train)
-
-            train_loss = F.mse_loss(
-                y_pred,
-                y_train,
-            )
-            train_loss.backward()
-
-            stepper = mask if mask else optim
-            stepper.step()
-            lr_scheduler.step(i + e / iters)
-
-            # Update pbar
-            pbar.update(1)
+        train_loss = train_epoch(
+            i,
+            train_loader,
+            model,
+            optim,
+            lr_scheduler,
+            grid,
+            img,
+            dict(mask=mask, pbar=pbar),
+        )
 
         # Apply mask
         if mask and i <= cfg.masking.end_when:
             if i % cfg.masking.interval == 0:
                 mask.update_connections()
 
+        # Evaluate
         if (i + 1) % cfg.train.log_iters == 0:
-            with torch.no_grad():
-                y_pred_full = torch.zeros_like(img)
+            y_pred_full, test_loss, test_PSNR = eval_epoch(
+                eval_loader, model, grid, img
+            )
 
-                for h_batch, w_batch in test_loader:
-                    x_test = grid[
-                        h_batch,
-                        w_batch,
-                    ]
-                    y_pred = model(x_test)
-                    y_pred_full[
-                        h_batch,
-                        w_batch,
-                    ] = y_pred
+            # pbar update
+            msg = [
+                f"Step: {i + 1}",
+                f"Train loss: {train_loss:.4f}",
+                f"Test loss: {test_loss:.4f}",
+                f"Test PSNR: {test_PSNR:.3f}",
+            ]
 
-                test_loss = F.mse_loss(y_pred_full, img)
+            if mask:
+                msg += [f"Mask Prune Rate {mask.prune_rate:.5f}"]
 
-                test_PSNR = 10 * torch.log10(1 / test_loss)
+            msg = " | ".join(msg)
+            pbar.set_description(msg)
+            logging.info(msg)
 
-                # pbar update
-                msg = f"Step: {i + 1} | Train loss: {train_loss:.4f} | Test loss: {test_loss:.4f} | Test PSNR: {test_PSNR:.3f}"
-
+            # W&B logs
+            if cfg.wandb.use:
+                img_name = Path(cfg.img.path).name
+                _log_dict = {
+                    "train_loss": train_loss,
+                    "test_loss": test_loss,
+                    "test_PSNR": test_PSNR,
+                    "image": [
+                        wandb.Image(
+                            y_pred_full.permute(2, 0, 1).detach(),
+                            caption=img_name,
+                        )
+                    ],
+                }
                 if mask:
-                    msg += f" | Mask Prune Rate {mask.prune_rate:.5f}"
-                pbar.set_description(msg)
-                logging.info(msg)
-
-                if cfg.wandb.use:
-                    # W&B logs
-                    img_name = Path(cfg.img.path).name
-                    _log_dict = {
-                        "train_loss": train_loss,
-                        "test_loss": test_loss,
-                        "test_PSNR": test_PSNR,
-                        "image": [
-                            wandb.Image(
-                                y_pred_full.permute(2, 0, 1).detach(),
-                                caption=img_name,
-                            )
-                        ],
-                    }
-                    if mask:
-                        _log_dict = {
-                            **_log_dict,
+                    _log_dict.update(
+                        {
                             "prune_rate": mask.prune_rate,
                             "density": mask.stats.total_density,
                         }
-                    wandb.log(_log_dict, step=i + 1)
+                    )
+                wandb.log(_log_dict, step=i + 1)
 
     # Save weights
     if cfg.train.save_weights:
         state = {
-            "state_dict": compress_indices(model.state_dict()),
+            "state_dict": model.state_dict(),
         }
         torch.save(state, "model.pth")
 

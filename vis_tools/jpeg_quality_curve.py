@@ -9,7 +9,7 @@ from omegaconf import DictConfig, OmegaConf
 from pathlib import Path
 
 import time
-from utils.train_utils import load_img
+from utils.data import load_img
 from hurry.filesize import size as hurry_size
 
 

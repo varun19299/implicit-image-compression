@@ -1,11 +1,9 @@
 import cv2
 import kornia
-from matplotlib import pyplot as plt
-import torch
-from torch.utils.data import Dataset, DataLoader
 import numpy as np
-
-from typing import Dict, List, Union
+import torch
+from matplotlib import pyplot as plt
+from torch.utils.data import Dataset, DataLoader
 
 
 class SliceDataset(Dataset):
@@ -41,13 +39,6 @@ def get_dataloaders(img: torch.Tensor, batch_height, batch_width):
     )
 
     return train_loader, test_loader
-
-
-def get_device(device_str: str) -> torch.device:
-    if device_str == "cuda" and torch.cuda.is_available():
-        return torch.device(device_str)
-    else:
-        return torch.device("cpu")
 
 
 def load_img(
@@ -90,27 +81,3 @@ def get_grid(height: int, width: int) -> torch.Tensor:
     grid = torch.from_numpy(np.stack(np.meshgrid(coords_h, coords_w), -1)).float()
 
     return grid
-
-
-def compress_indices(state_dict: Dict) -> Dict:
-    """
-    Compresses index tensors of sparse matrices (using int8/16/32).
-    :param state_dict: MLPs state dict
-    :return: a compressed version
-    """
-
-    def highest_precision(tensor: torch.Tensor):
-        if tensor.max() < 2 ** 8:
-            return torch.int8
-        elif tensor.max() < 2 ** 16:
-            return torch.int16
-        elif tensor.max() < 2 ** 32:
-            return torch.int32
-        else:
-            return torch.int64
-
-    for key in state_dict.keys():
-        if "indices" in key:
-            state_dict[key] = state_dict[key].to(highest_precision(state_dict[key]))
-
-    return state_dict
