@@ -164,7 +164,7 @@ def main(cfg: DictConfig):
     if cfg.wandb.use:
         wandb.join()
 
-    return test_PSNR.item()
+    return test_PSNR
 
 
 if __name__ == "__main__":
