@@ -2,7 +2,10 @@ import torch
 from torch import nn
 import numpy as np
 
+from dataclasses import dataclass
 
+
+@dataclass(eq=False, repr=False)
 class SineLayer(nn.Module):
     """
     Paper: https://arxiv.org/abs/2006.09661
@@ -18,43 +21,31 @@ class SineLayer(nn.Module):
     activations constant, but boost gradients to the weight matrix (see supplement Sec. 1.5)
     """
 
-    def __init__(
-        self,
-        in_features: int,
-        out_features: int,
-        bias: bool = True,
-        is_first: bool = False,
-        omega_0: float = 30.0,
-        no_activation: bool = False,
-        simulate_quantization: bool = False,
-    ):
-        super().__init__()
-        self.omega_0 = omega_0
-        self.is_first = is_first
-        self.no_activation = no_activation
-        self.simulate_quantization = simulate_quantization
+    in_features: int
+    out_features: int
+    bias: bool = True
+    is_first: bool = False
+    omega_0: float = 30.0
+    no_activation: bool = False
+    simulate_quantization: bool = False
 
-        self.in_features = in_features
-        self.linear = nn.Linear(in_features, out_features, bias=bias)
+    def __post_init__(self):
+        super().__init__()
+        self.linear = nn.Linear(self.in_features, self.out_features, bias=self.bias)
 
         self.quant = torch.quantization.QuantStub()
         self.dequant = torch.quantization.DeQuantStub()
 
         self.init_weights()
 
+    @torch.no_grad()
     def init_weights(self):
-        with torch.no_grad():
-            if self.is_first:
-                bound = 1 / self.in_features
-                self.linear.weight.uniform_(-bound, bound)
-                setattr(self.linear, "scaler", bound)
-            else:
-                bound = np.sqrt(6 / self.in_features) / self.omega_0
-                self.linear.weight.uniform_(
-                    -bound,
-                    bound,
-                )
-                setattr(self.linear, "scaler", bound)
+        if self.is_first:
+            bound = 1 / self.in_features
+        else:
+            bound = np.sqrt(6 / self.in_features) / self.omega_0
+        self.linear.weight.uniform_(-bound, bound)
+        setattr(self.linear, "scaler", bound)
 
     def forward(self, x: torch.Tensor):
         if self.simulate_quantization:
@@ -76,8 +67,8 @@ class Siren(nn.Module):
         output_size: int = 3,
         depth: int = 8,
         hidden_size: int = 256,
-        first_omega_0: float = 30.0,
-        hidden_omega_0: float = 30.0,
+        first_omega_0: float = 50.0,
+        hidden_omega_0: float = 50.0,
         outermost_linear: bool = True,
         simulate_quantization: bool = False,
         **kwargs
@@ -99,7 +90,6 @@ class Siren(nn.Module):
                 SineLayer(
                     hidden_size,
                     hidden_size,
-                    is_first=False,
                     omega_0=hidden_omega_0,
                     simulate_quantization=simulate_quantization,
                 )
@@ -109,7 +99,6 @@ class Siren(nn.Module):
             SineLayer(
                 hidden_size,
                 output_size,
-                is_first=False,
                 omega_0=hidden_omega_0,
                 no_activation=outermost_linear,
                 simulate_quantization=simulate_quantization,

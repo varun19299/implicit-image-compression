@@ -40,6 +40,4 @@ if [ $SLURM_ARRAY_TASK_ID -eq 0 ]; then
 fi
 
 # Start Job here
-python main.py +masking=RigL masking.density=${1} exp_name='${masking.name}_${masking.density}_trainx_${train.multiplier}' train.multiplier=5 --cfg job
-
-wait
+make siren

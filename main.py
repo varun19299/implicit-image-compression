@@ -101,7 +101,7 @@ def main(cfg: DictConfig):
             lr_scheduler,
             grid,
             img,
-            dict(mask=mask, pbar=pbar),
+            **dict(mask=mask, pbar=pbar),
         )
 
         # Apply mask

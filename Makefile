@@ -34,13 +34,21 @@ help : Makefile
     endif
 
 # Config defaults
-DEVICE := cpu
 EXP_NAME := flower_16bit
 
 ## fit: Implicit MLP image fitting
-fit:
+siren:
 	${PYTHON} main.py \
  	exp_name=$(EXP_NAME) \
- 	device=$(DEVICE) $(KWARGS) $(HYDRA_FLAGS)
+ 	$(KWARGS) $(HYDRA_FLAGS)
 
-all: fit
+MASKING := RigL
+DENSITY := 0.5
+TRAIN_MUL := 5
+prune:
+	${PYTHON} main.py \
+	+masking=$(MASKING) masking.density=$(DENSITY) train.multiplier=$(TRAIN_MUL) \
+ 	exp_name='$${masking.name}_$${masking.density}_trainx_$${train.multiplier}' \
+ 	$(KWARGS) $(HYDRA_FLAGS)
+
+all: siren prune

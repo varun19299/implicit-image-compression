@@ -34,26 +34,26 @@ def compress_indices(state_dict: Dict) -> Dict:
     return state_dict
 
 
+@torch.no_grad()
 def eval_epoch(
     eval_loader: DataLoader, model: Module, grid, img, **kwargs
 ) -> Tuple[torch.Tensor, float, float]:
-    with torch.no_grad():
-        y_pred_full = torch.zeros_like(img)
+    model.eval()
+    y_pred_full = torch.zeros_like(img)
 
-        for h_batch, w_batch in eval_loader:
-            x_test = grid[
-                h_batch,
-                w_batch,
-            ]
-            y_pred = model(x_test)
-            y_pred_full[
-                h_batch,
-                w_batch,
-            ] = y_pred
+    for h_batch, w_batch in eval_loader:
+        x_test = grid[
+            h_batch,
+            w_batch,
+        ]
+        y_pred = model(x_test)
+        y_pred_full[
+            h_batch,
+            w_batch,
+        ] = y_pred
 
-        test_loss = F.mse_loss(y_pred_full, img)
-
-        test_PSNR = 10 * torch.log10(1 / test_loss)
+    test_loss = F.mse_loss(y_pred_full, img)
+    test_PSNR = 10 * torch.log10(1 / test_loss)
 
     return y_pred_full, test_loss.item(), test_PSNR.item()
 
@@ -122,7 +122,7 @@ def train_epoch(
     pbar = kwargs.get("pbar")
     criterion = kwargs.get("criterion", F.mse_loss)
 
-    iters = len(train_loader)
+    model.train()
 
     # Single epoch
     for e, (h_slice, w_slice) in enumerate(train_loader):
@@ -148,9 +148,9 @@ def train_epoch(
 
         stepper = mask if mask else optim
         stepper.step()
-        lr_scheduler.step(epoch + e / iters)
 
         # Update pbar
         pbar.update(1)
 
+    lr_scheduler.step()
     return train_loss.item()
