@@ -1,13 +1,19 @@
+from contextlib import contextmanager
 from typing import Dict, Tuple
 
 import torch
 from omegaconf import DictConfig
 from torch.nn import Module, functional as F
-from torch.utils.data import DataLoader
 from torch.optim import Optimizer
+from torch.utils.data import DataLoader
 
 from sparselearning.core import Masking
 from sparselearning.funcs.decay import registry as decay_registry
+
+
+@contextmanager
+def _blank_context():
+    yield
 
 
 def compress_indices(state_dict: Dict) -> Dict:
@@ -38,6 +44,9 @@ def compress_indices(state_dict: Dict) -> Dict:
 def eval_epoch(
     eval_loader: DataLoader, model: Module, grid, img, **kwargs
 ) -> Tuple[torch.Tensor, float, float]:
+    # Automatic mixed precision
+    context = kwargs.get("criterion", _blank_context)
+
     model.eval()
     y_pred_full = torch.zeros_like(img)
 
@@ -46,7 +55,8 @@ def eval_epoch(
             h_batch,
             w_batch,
         ]
-        y_pred = model(x_test)
+        with context():
+            y_pred = model(x_test)
         y_pred_full[
             h_batch,
             w_batch,
@@ -122,6 +132,10 @@ def train_epoch(
     lr_scheduler = kwargs.get("lr_scheduler")
     criterion = kwargs.get("criterion", F.mse_loss)
 
+    # Automatic mixed precision
+    context = kwargs.get("criterion", _blank_context)
+    scaler = kwargs.get("scaler")
+
     model.train()
 
     # Single epoch
@@ -137,17 +151,35 @@ def train_epoch(
             h_slice,
             w_slice,
         ]
-        y_pred = model(x_train)
+        with context():
+            y_pred = model(x_train)
 
-        # Any callable
-        train_loss = criterion(
-            y_pred,
-            y_train,
-        )
-        train_loss.backward()
+            # Any callable
+            train_loss = criterion(
+                y_pred,
+                y_train,
+            )
 
-        stepper = mask if mask else optim
-        stepper.step()
+        if scaler:
+            # Scales the loss, and calls backward()
+            # to create scaled gradients
+            scaler.scale(train_loss).backward()
+        else:
+            train_loss.backward()
+
+        if mask:
+            # If mask, pass the scalar to it
+            mask.step(scaler)
+        else:
+            if scaler:
+                # Unscales gradients and calls
+                # or skips optimizer.step()
+                scaler.step(optim)
+
+                # Updates the scale for next iteration
+                scaler.update()
+            else:
+                optim.step()
 
         # Update pbar
         pbar.update(1)

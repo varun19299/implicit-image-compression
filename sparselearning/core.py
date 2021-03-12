@@ -163,7 +163,7 @@ class Masking(object):
 
     # stats
     mask_step: int = 0
-    
+
     input_size: "Tuple" = (1, 3, 32, 32)
 
     def __post_init__(self):
@@ -275,7 +275,8 @@ class Masking(object):
         """
         for name, weight in self.module.named_parameters():
             if name in self.mask_dict:
-                weight.data = weight.data * self.mask_dict[name]
+                dtype = weight.data.dtype
+                weight.data = (weight.data * self.mask_dict[name]).to(dtype)
 
     @torch.no_grad()
     def apply_mask_gradients(self):
@@ -469,7 +470,7 @@ class Masking(object):
     def global_prune(self):
         return "global" in self.prune_mode
 
-    def get_momentum_for_weight(self, weight:str)->"Tensor":
+    def get_momentum_for_weight(self, weight: str) -> "Tensor":
         """
         Return momentum from optimizer (SGD or Adam)
 
@@ -666,12 +667,18 @@ class Masking(object):
         }
         return _state_dict
 
-    def step(self):
+    def step(self, scaler=None):
         """
         Performs an optimizer step
         (i.e, no update to mask topology).
+
+        :param scaler: Mixed precision scalar
+            e.g torch.cuda.amp.GradScaler()
         """
-        self.optimizer.step()
+        if scaler:
+            scaler.step(self.optimizer)
+        else:
+            self.optimizer.step()
         self.apply_mask()
 
         if not self.dense_gradients:

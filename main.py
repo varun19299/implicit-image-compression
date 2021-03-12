@@ -82,16 +82,26 @@ def main(cfg: DictConfig):
     # Train
     model.train()
     optim = torch.optim.Adam(model.parameters(), lr=cfg.train.learning_rate)
-    # To use lr_scheduler, uncomment and add to train_epoch()'s kwargs
-    # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-    #     optim, eta_min=1e-5, T_max=cfg.train.num_steps, last_epoch=-1
-    # )
 
-    # Setup mask if cfg.masking != {}
-    mask = setup_mask(model, optim, cfg.get("masking"))
+    # empirically, step lr (cut by 5 after 1k steps) should be better
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 1000, gamma=0.2)
+    train_kwargs = {"lr_scheduler": lr_scheduler}
+    eval_kwargs = {}
 
     # tqdm
     pbar = tqdm(total=cfg.train.num_steps, dynamic_ncols=True)
+    train_kwargs.update({"pbar": pbar})
+
+    # Setup mask if cfg.masking != {}
+    mask = setup_mask(model, optim, cfg.get("masking"))
+    train_kwargs.update({"mask": mask})
+
+    # AMP
+    if cfg.train.mixed_precision:
+        scaler = torch.cuda.amp.GradScaler()
+        context = torch.cuda.amp.autocast
+        train_kwargs.update({"scaler": scaler, "context": context})
+        eval_kwargs.update({"context": context})
 
     for i in range(cfg.train.num_steps):
         train_loss = train_epoch(
@@ -101,7 +111,7 @@ def main(cfg: DictConfig):
             optim,
             grid,
             img,
-            **dict(mask=mask, pbar=pbar),
+            **train_kwargs,
         )
 
         # Apply mask
@@ -112,7 +122,7 @@ def main(cfg: DictConfig):
         # Evaluate
         if (i + 1) % cfg.train.log_iters == 0:
             y_pred_full, test_loss, test_PSNR = eval_epoch(
-                eval_loader, model, grid, img
+                eval_loader, model, grid, img, **eval_kwargs
             )
 
             # pbar update

@@ -19,6 +19,7 @@ train:
   batch_width: ${img.width}
   save_weights: False
   multiplier: 1
+  mixed_precision: False
 
 wandb:
   use: True
