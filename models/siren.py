@@ -45,18 +45,23 @@ class SineLayer(nn.Module):
         else:
             bound = np.sqrt(6 / self.in_features) / self.omega_0
         self.linear.weight.uniform_(-bound, bound)
+
+        # Feathermap requires the scaler bound
+        # on uniform initialization
         setattr(self.linear, "scaler", bound)
 
     def forward(self, x: torch.Tensor):
         if self.simulate_quantization:
             x = self.quant(x)
-
-        x = self.linear(x) * self.omega_0
-
-        if self.simulate_quantization:
+            x = self.linear(x)
             x = self.dequant(x)
+        else:
+            x = self.linear(x)
+
         if not self.no_activation:
-            x = torch.sin(x)
+            # Use sine activation
+            x = torch.sin(x * self.omega_0)
+
         return x
 
 
@@ -109,6 +114,6 @@ class Siren(nn.Module):
 
     def forward(self, x: torch.Tensor):
         # 0...1 -> -1...1
-        x = (x - 0.5) * 2
+        # x = (x - 0.5) * 2
         # -1...1 -> 0...1
         return self.layers(x) / 2 + 0.5

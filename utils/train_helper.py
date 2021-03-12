@@ -112,7 +112,6 @@ def train_epoch(
     train_loader: DataLoader,
     model: Module,
     optim: Optimizer,
-    lr_scheduler,
     grid,
     img,
     **kwargs
@@ -120,6 +119,7 @@ def train_epoch(
     # Unpack
     mask = kwargs.get("mask")
     pbar = kwargs.get("pbar")
+    lr_scheduler = kwargs.get("lr_scheduler")
     criterion = kwargs.get("criterion", F.mse_loss)
 
     model.train()
@@ -152,5 +152,6 @@ def train_epoch(
         # Update pbar
         pbar.update(1)
 
-    lr_scheduler.step()
+    if lr_scheduler:
+        lr_scheduler.step()
     return train_loss.item()

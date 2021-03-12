@@ -82,9 +82,10 @@ def main(cfg: DictConfig):
     # Train
     model.train()
     optim = torch.optim.Adam(model.parameters(), lr=cfg.train.learning_rate)
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optim, eta_min=1e-5, T_max=cfg.train.num_steps, last_epoch=-1
-    )
+    # To use lr_scheduler, uncomment and add to train_epoch()'s kwargs
+    # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+    #     optim, eta_min=1e-5, T_max=cfg.train.num_steps, last_epoch=-1
+    # )
 
     # Setup mask if cfg.masking != {}
     mask = setup_mask(model, optim, cfg.get("masking"))
@@ -98,7 +99,6 @@ def main(cfg: DictConfig):
             train_loader,
             model,
             optim,
-            lr_scheduler,
             grid,
             img,
             **dict(mask=mask, pbar=pbar),
