@@ -23,7 +23,9 @@ class SineLayer(nn.Module):
 
     in_features: int
     out_features: int
-    bias: bool = True
+    # Dont use "bias" as an attribute here,
+    # will be troublesome to filter in `sparslearning`
+    has_bias: bool = True
     is_first: bool = False
     omega_0: float = 30.0
     no_activation: bool = False
@@ -31,7 +33,7 @@ class SineLayer(nn.Module):
 
     def __post_init__(self):
         super().__init__()
-        self.linear = nn.Linear(self.in_features, self.out_features, bias=self.bias)
+        self.linear = nn.Linear(self.in_features, self.out_features, bias=self.has_bias)
 
         self.quant = torch.quantization.QuantStub()
         self.dequant = torch.quantization.DeQuantStub()

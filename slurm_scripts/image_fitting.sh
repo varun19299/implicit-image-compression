@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1               # total number of tasks across all nodes
 #SBATCH --cpus-per-task=4       # cpu-cores per task (>1 if multi-threaded tasks)
 #SBATCH --mem-per-cpu=4G         # memory per cpu-core
-#SBATCH --time=2:00:00          # total run time limit (HH:MM:SS)
+#SBATCH --time=10:00:00          # total run time limit (HH:MM:SS)
 #SBATCH --gres=gpu:rtx2080ti:1     # GPU needed ##SBATCH --array=0-1
 
 # Mailing stuff
@@ -42,5 +42,10 @@ fi
 # Start Job here
 #make siren
 
-python main.py exp_name='siren_depth_${mlp.depth}_amp' mlp.depth=4 train.mixed_precision=True train.multiplier=2 train.save_weights=True
+python main.py \
+exp_name='siren_depth_${mlp.depth}_amp_quant_density_${masking.density}_trainx_${train.multiplier}' \
+mlp.depth=4 train.mixed_precision=True \
+mlp.simulate_quantization=True \
++masking=RigL masking.density=0.5 \
+train.multiplier=5 train.save_weights=True
 

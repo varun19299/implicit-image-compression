@@ -404,6 +404,7 @@ class Masking(object):
             if hasattr(module, "weight"):
                 total_size += module.weight.numel()
             if getattr(module, "bias", None) is not None:
+                # breakpoint()
                 total_size += module.bias.numel()
         logging.info(f"Total Model parameters: {total_size}.")
 
@@ -676,7 +677,12 @@ class Masking(object):
             e.g torch.cuda.amp.GradScaler()
         """
         if scaler:
+            # Unscales gradients and calls
+            # or skips optimizer.step()
             scaler.step(self.optimizer)
+
+            # Updates the scale for next iteration
+            scaler.update()
         else:
             self.optimizer.step()
         self.apply_mask()

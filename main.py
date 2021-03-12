@@ -84,7 +84,7 @@ def main(cfg: DictConfig):
     optim = torch.optim.Adam(model.parameters(), lr=cfg.train.learning_rate)
 
     # empirically, step lr (cut by 5 after 1k steps) should be better
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 1000, gamma=0.2)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 1000, gamma=0.5)
     train_kwargs = {"lr_scheduler": lr_scheduler}
     eval_kwargs = {}
 

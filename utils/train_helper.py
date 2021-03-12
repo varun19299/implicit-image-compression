@@ -112,6 +112,7 @@ def setup_mask(
             growth_mode=masking_cfg.growth_mode,
             redistribution_mode=masking_cfg.redistribution_mode,
         )
+        model.train()
         mask.add_module(model)
 
         return mask
@@ -127,7 +128,7 @@ def train_epoch(
     **kwargs
 ) -> float:
     # Unpack
-    mask = kwargs.get("mask")
+    mask: Masking = kwargs.get("mask")
     pbar = kwargs.get("pbar")
     lr_scheduler = kwargs.get("lr_scheduler")
     criterion = kwargs.get("criterion", F.mse_loss)
