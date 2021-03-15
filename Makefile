@@ -15,9 +15,9 @@ install:
 	pip install -r requirements.txt
 
 setup_zsh:
-	@apt-get install -y zsh tree htop vim
+	@sudo apt-get install -y zsh
 	@echo "Yes" | sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-	@source ~/.zshrc
+	@zsh
 
 colab_install: setup_zsh install
 

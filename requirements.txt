@@ -1,5 +1,6 @@
 black
 einops
+torch>=1.6
 kornia
 hurry.filesize
 
@@ -16,6 +17,6 @@ git+https://github.com/facebookresearch/hydra.git#egg=hydra-optuna-sweeper&subdi
 matplotlib
 numpy
 opencv-python
-pyyaml
+pyyaml>=5.4
 tqdm
 wandb
