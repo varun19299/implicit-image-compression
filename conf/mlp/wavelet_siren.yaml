@@ -1,0 +1,9 @@
+# @package mlp
+name: wavelet_siren
+depth: 8
+hidden_size: 128
+wavelet_levels: 1
+first_omega_0: 50
+hidden_omega_0: 30  # ${mlp.first_omega_0}
+outermost_linear: True
+simulate_quantization: False

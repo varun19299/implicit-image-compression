@@ -16,7 +16,7 @@ import torch.nn.functional as F
 # Modules
 from models import registry as model_registry
 from utils.catch_error import catch_error_decorator
-from utils.data import get_dataloaders, load_img, get_grid
+from utils.data import load_img, get_grid
 from utils.train_helper import eval_epoch, get_device, setup_mask, train_epoch
 
 

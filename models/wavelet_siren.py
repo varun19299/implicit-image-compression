@@ -79,7 +79,7 @@ class WaveletSiren(nn.Module):
 
         # Inverse DWT
         out_image = self.IDWT((LF_image, [HF_image]))
-        return out_image
+        return rearrange(out_image, "1 c h w -> h w c")
 
 
 if __name__ == "__main__":
