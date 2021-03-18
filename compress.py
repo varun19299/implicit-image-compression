@@ -1,5 +1,6 @@
 import torch
 from sklearn.cluster import KMeans
+from utils.kmeans import KMeans as KMeans_torch
 import numpy as np
 import torch.nn as nn
 
@@ -87,23 +88,33 @@ class DeepCompressor:
 
     def find_centroids(self, weight):
         device = weight.data.device
-        weight_np = weight.data.cpu().numpy()
+        weight_np = weight.data  # .cpu().numpy()
         weight_np = weight_np.reshape(-1, 1)
 
         # Exclude zeros
         weight_nonzero = weight_np[weight_np != 0].reshape(-1, 1)
 
         # Linear guess
-        guess = np.linspace(
-            np.min(weight_nonzero),
-            np.max(weight_nonzero),
+        # guess = np.linspace(
+        #     weight_nonzero.min(),
+        #     weight_nonzero.max(),
+        #     self.n_clusters - 1,
+        #     dtype=np.float32,
+        # )
+        guess = torch.linspace(
+            weight_nonzero.min(),
+            weight_nonzero.max(),
             self.n_clusters - 1,
-            dtype=np.float32,
         )
-        guess = guess.reshape(guess.size, 1)
+        guess = guess.reshape(-1, 1)
 
-        kmeans = KMeans(
-            n_clusters=self.n_clusters - 1, init=guess, random_state=0, n_init=1
+        # kmeans = KMeans(
+        #     n_clusters=self.n_clusters - 1, init=guess, random_state=0, n_init=1
+        # ).fit(weight_nonzero)
+
+        kmeans = KMeans_torch(
+            n_clusters=self.n_clusters - 1,
+            centroids=guess,
         ).fit(weight_nonzero)
         centroids = kmeans.cluster_centers_
 
@@ -158,11 +169,11 @@ if __name__ == "__main__":
 
     # w/o kmeans
     with catchtime() as t:
-        model(torch.rand(1,2))
+        model(torch.rand(5, 5, 2))
     print(f"Timing without kMeans {t()}")
 
     with catchtime() as t:
-        model(torch.rand(1, 2)).sum().backward()
+        model(torch.rand(5, 5, 2)).sum().backward()
     print(f"Backward without kMeans {t()}")
 
     optim = torch.optim.Adam(model.parameters(), lr=1e-3)
@@ -170,9 +181,9 @@ if __name__ == "__main__":
 
     # w kmeans
     with catchtime() as t:
-        model(torch.rand(1,2))
+        model(torch.rand(5, 5, 2))
     print(f"\nTiming with kMeans {t()}")
 
     with catchtime() as t:
-        model(torch.rand(1, 2)).sum().backward()
+        model(torch.rand(5, 5, 2)).sum().backward()
     print(f"Backward with kMeans {t()}")

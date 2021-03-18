@@ -31,16 +31,11 @@ def main(cfg: DictConfig):
     # Set device
     device = get_device(cfg.device)
 
-    # Image
+    # Image (H x W x 3)
     img = load_img(**cfg.img)
 
     # Grid (H x W x 2)
     grid = get_grid(cfg.img.height, cfg.img.width)
-
-    # Slice loaders
-    train_loader, eval_loader = get_dataloaders(
-        img, cfg.train.batch_height, cfg.train.batch_width
-    )
 
     # Construct composed (Siren or MLP)
     _, _, c = grid.shape
@@ -106,7 +101,6 @@ def main(cfg: DictConfig):
     for i in range(cfg.train.num_steps):
         train_loss = train_epoch(
             i,
-            train_loader,
             model,
             optim,
             grid,
@@ -121,9 +115,7 @@ def main(cfg: DictConfig):
 
         # Evaluate
         if (i + 1) % cfg.train.log_iters == 0:
-            y_pred_full, test_loss, test_PSNR = eval_epoch(
-                eval_loader, model, grid, img, **eval_kwargs
-            )
+            pred, test_loss, test_PSNR = eval_epoch(model, grid, img, **eval_kwargs)
 
             # pbar update
             msg = [
@@ -149,7 +141,7 @@ def main(cfg: DictConfig):
                     "test_PSNR": test_PSNR,
                     "image": [
                         wandb.Image(
-                            y_pred_full.permute(2, 0, 1).detach(),
+                            pred.permute(2, 0, 1).detach(),
                             caption=img_name,
                         )
                     ],

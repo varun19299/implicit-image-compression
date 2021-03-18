@@ -2,6 +2,8 @@ import torch
 from torch import nn
 import numpy as np
 
+from einops import rearrange
+
 
 class Encoding(nn.Module):
     def __init__(
@@ -51,6 +53,11 @@ class FourierNet(nn.Module):
         self.encoding = Encoding(input_size, map_size, map_scale)
         self.layers = nn.Sequential(*layers)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, grid: torch.Tensor):
+        # Flatten grid
+        x = rearrange(grid, "h w c -> (h w) c")
+
         x = self.encoding(x)
-        return self.layers(x)
+
+        h, w, _ = grid.shape
+        return rearrange(x, "(h w) c -> h w c", h=h, w=w)

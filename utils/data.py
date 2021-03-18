@@ -74,10 +74,14 @@ def load_img(
     return img
 
 
-def get_grid(height: int, width: int) -> torch.Tensor:
+def get_grid(
+    height: int, width: int, device: torch.device = torch.device("cpu")
+) -> torch.Tensor:
     # Create input pixel coordinates in the unit square
-    coords_h = np.linspace(0, 1, height, endpoint=False)
-    coords_w = np.linspace(0, 1, width, endpoint=False)
-    grid = torch.from_numpy(np.stack(np.meshgrid(coords_h, coords_w), -1)).float()
+    coords_h = torch.linspace(0, 1, height, device=device)
+    coords_w = torch.linspace(0, 1, width, device=device)
+
+    # H x W x 2
+    grid = torch.stack(torch.meshgrid(coords_h, coords_w), dim=-1)
 
     return grid

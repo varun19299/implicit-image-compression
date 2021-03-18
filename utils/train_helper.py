@@ -41,31 +41,19 @@ def compress_indices(state_dict: Dict) -> Dict:
 
 
 @torch.no_grad()
-def eval_epoch(
-    eval_loader: DataLoader, model: Module, grid, img, **kwargs
-) -> Tuple[torch.Tensor, float, float]:
+def eval_epoch(model: Module, grid, img, **kwargs) -> Tuple[torch.Tensor, float, float]:
     # Automatic mixed precision
     context = kwargs.get("criterion", _blank_context)
 
     model.eval()
-    y_pred_full = torch.zeros_like(img)
 
-    for h_batch, w_batch in eval_loader:
-        x_test = grid[
-            h_batch,
-            w_batch,
-        ]
-        with context():
-            y_pred = model(x_test)
-        y_pred_full[
-            h_batch,
-            w_batch,
-        ] = y_pred
+    with context():
+        pred = model(grid)
 
-    test_loss = F.mse_loss(y_pred_full, img)
+    test_loss = F.mse_loss(pred, img)
     test_PSNR = 10 * torch.log10(1 / test_loss)
 
-    return y_pred_full, test_loss.item(), test_PSNR.item()
+    return pred, test_loss.item(), test_PSNR.item()
 
 
 def get_device(device_str: str) -> torch.device:
@@ -119,13 +107,7 @@ def setup_mask(
 
 
 def train_epoch(
-    epoch: int,
-    train_loader: DataLoader,
-    model: Module,
-    optim: Optimizer,
-    grid,
-    img,
-    **kwargs
+    epoch: int, model: Module, optim: Optimizer, grid, img, **kwargs
 ) -> float:
     # Unpack
     mask: Masking = kwargs.get("mask")
@@ -139,51 +121,38 @@ def train_epoch(
 
     model.train()
 
-    # Single epoch
-    for e, (h_slice, w_slice) in enumerate(train_loader):
-        model.zero_grad()
-        optim.zero_grad()
+    with context():
+        pred = model(grid)
 
-        x_train = grid[
-            h_slice,
-            w_slice,
-        ]
-        y_train = img[
-            h_slice,
-            w_slice,
-        ]
-        with context():
-            y_pred = model(x_train)
+        # Any callable
+        train_loss = criterion(
+            pred,
+            img,
+        )
 
-            # Any callable
-            train_loss = criterion(
-                y_pred,
-                y_train,
-            )
+    if scaler:
+        # Scales the loss, and calls backward()
+        # to create scaled gradients
+        scaler.scale(train_loss).backward()
+    else:
+        train_loss.backward()
 
+    if mask:
+        # If mask, pass the scalar to it
+        mask.step(scaler)
+    else:
         if scaler:
-            # Scales the loss, and calls backward()
-            # to create scaled gradients
-            scaler.scale(train_loss).backward()
+            # Unscales gradients and calls
+            # or skips optimizer.step()
+            scaler.step(optim)
+
+            # Updates the scale for next iteration
+            scaler.update()
         else:
-            train_loss.backward()
+            optim.step()
 
-        if mask:
-            # If mask, pass the scalar to it
-            mask.step(scaler)
-        else:
-            if scaler:
-                # Unscales gradients and calls
-                # or skips optimizer.step()
-                scaler.step(optim)
-
-                # Updates the scale for next iteration
-                scaler.update()
-            else:
-                optim.step()
-
-        # Update pbar
-        pbar.update(1)
+    # Update pbar
+    pbar.update(1)
 
     if lr_scheduler:
         lr_scheduler.step()

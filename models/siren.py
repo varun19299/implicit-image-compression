@@ -3,7 +3,7 @@ from torch import nn
 import numpy as np
 
 from dataclasses import dataclass
-
+from einops import rearrange
 
 @dataclass(eq=False, repr=False)
 class SineLayer(nn.Module):
@@ -114,8 +114,15 @@ class Siren(nn.Module):
 
         self.layers = nn.Sequential(*layers)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, grid: torch.Tensor):
+        # Flatten grid
+        x = rearrange(grid, "h w c -> (h w) c")
+
         # 0...1 -> -1...1
-        # x = (x - 0.5) * 2
+        x = (x - 0.5) * 2
+
         # -1...1 -> 0...1
-        return self.layers(x) / 2 + 0.5
+        x = self.layers(x) / 2 + 0.5
+
+        h, w, _ = grid.shape
+        return rearrange(x, "(h w) c -> h w c", h=h, w= w)
