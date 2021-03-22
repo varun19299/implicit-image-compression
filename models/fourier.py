@@ -13,9 +13,10 @@ class Encoding(nn.Module):
         map_scale: float = 10.0,
     ):
         super().__init__()
+        assert map_size % 2 == 0, "Need even map size"
 
         self.B = nn.Parameter(
-            torch.randn(input_size, map_size) * map_scale, requires_grad=False
+            torch.randn(input_size, map_size // 2) * map_scale, requires_grad=False
         )
 
     def forward(self, x: torch.Tensor):
@@ -30,15 +31,15 @@ class FourierNet(nn.Module):
         input_size: int = 2,
         output_size: int = 3,
         depth: int = 8,
-        hidden_size: int = 256,
-        map_size: int = 256,
+        hidden_size: int = 128,
+        map_size: int = 128,
         map_scale: float = 10.0,
         **kwargs,
     ):
         super().__init__()
 
         # mapping to hidden, first layer
-        layers = [nn.Linear(map_size * 2, hidden_size)]
+        layers = [nn.Linear(map_size, hidden_size)]
         layers.append(nn.ReLU(inplace=True))
 
         # hidden layers
@@ -61,3 +62,8 @@ class FourierNet(nn.Module):
 
         h, w, _ = grid.shape
         return rearrange(x, "(h w) c -> h w c", h=h, w=w)
+
+
+if __name__ == "__main__":
+    model = FourierNet()
+    model(torch.rand(10, 10, 2))
