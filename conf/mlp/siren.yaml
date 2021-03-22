@@ -1,7 +1,7 @@
 # @package mlp
 name: siren
 depth: 8
-hidden_size: 256
+hidden_size: 128
 first_omega_0: 50
 hidden_omega_0: 30 # ${mlp.first_omega_0}
 outermost_linear: True

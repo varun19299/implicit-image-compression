@@ -1,9 +1,11 @@
 from models.siren import Siren
 import torch
 from torch import nn
+from torch.nn import functional as F
 from utils.data import get_grid
 from einops import rearrange
 from pytorch_wavelets import DWTInverse, DWTForward
+import kornia
 
 
 class WaveletSiren(nn.Module):
@@ -12,7 +14,7 @@ class WaveletSiren(nn.Module):
         input_size: int = 2,
         output_size: int = 3,
         depth: int = 8,
-        hidden_size: int = 256,
+        hidden_size: int = 64,
         wavelet_levels: int = 1,
         first_omega_0: float = 50.0,
         hidden_omega_0: float = 50.0,
@@ -25,6 +27,7 @@ class WaveletSiren(nn.Module):
         self.wavelet_levels = wavelet_levels
         self.wavelet_windows = 3
 
+        # predict Y, Cb, Cr
         self.LF_siren = Siren(
             input_size,
             output_size,
@@ -37,9 +40,10 @@ class WaveletSiren(nn.Module):
             **kwargs
         )
 
+        # predict only Y
         self.HF_siren = Siren(
             input_size,
-            output_size * wavelet_levels * 3,
+            output_size * wavelet_levels,
             depth,
             hidden_size,
             first_omega_0,
@@ -69,16 +73,42 @@ class WaveletSiren(nn.Module):
         HF_grid = get_grid(self.HF_h_ll[0], self.HF_h_ll[0], device=device)
         HF_image = self.HF_siren(HF_grid)  # H x W x 3 * levels
 
-        LF_image = rearrange(LF_image, "h w c -> 1 c h w")
-        HF_image = rearrange(
+        # LF_image = rearrange(LF_image, "h w c -> 1 c h w")
+        # HF_image = rearrange(
+        #     HF_image,
+        #     "h w (l c) -> 1 c l h w",
+        #     l=self.wavelet_levels * self.wavelet_windows,
+        #     c=self.output_size,
+        # )
+        #
+        # # Inverse DWT
+        # out_image = self.IDWT((LF_image, [HF_image]))
+
+        Y_LF_image = rearrange(LF_image[:, :, 0], "h w -> 1 1 h w")
+        Y_HF_image = rearrange(
             HF_image,
-            "h w (l c) -> 1 c l h w",
+            "h w l -> 1 1 l h w",
             l=self.wavelet_levels * self.wavelet_windows,
-            c=self.output_size,
         )
 
         # Inverse DWT
-        out_image = self.IDWT((LF_image, [HF_image]))
+        Y_out_image = self.IDWT((Y_LF_image, [Y_HF_image]))
+
+        # Cb, Cr
+        scale = h / self.LF_h
+        Cb_Cr_LF_image = rearrange(LF_image[:, :, 1:], "h w c -> 1 c h w")
+        Cb_Cr_out_image = F.interpolate(
+            Cb_Cr_LF_image,
+            scale_factor=scale,
+            mode="bilinear",
+            align_corners=False,
+            recompute_scale_factor=True,
+        )
+
+        Y_Cb_Cr_out_image = torch.cat((Y_out_image, Cb_Cr_out_image), dim=1)
+
+        out_image = kornia.color.ycbcr.ycbcr_to_rgb(Y_Cb_Cr_out_image)
+
         return rearrange(out_image, "1 c h w -> h w c")
 
 

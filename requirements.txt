@@ -12,6 +12,7 @@ git+https://github.com/facebookresearch/hydra.git#egg=hydra-joblib-launcher&subd
 git+https://github.com/facebookresearch/hydra.git#egg=hydra-optuna-sweeper&subdirectory=plugins/hydra_optuna_sweeper
 
 # Pytorch Wavelets
+PyWavelets
 git+https://github.com/fbcotter/pytorch_wavelets
 
 matplotlib
