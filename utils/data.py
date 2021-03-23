@@ -49,6 +49,7 @@ def load_img(
     plot: bool = False,
     crop_mode: str = "centre-crop",
     save_gt: bool = False,
+    **kwargs
 ) -> torch.Tensor:
     img = cv2.imread(path, -1)[:, :, ::-1] / (2 ** bits - 1)
     img = torch.from_numpy(img.copy()).float().permute(2, 0, 1)

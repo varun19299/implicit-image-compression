@@ -1,8 +1,9 @@
 # @package img
-path: ${hydra:runtime.cwd}/img/rgb16bit/bridge.ppm
+name: bridge
+bits: 16
+path: ${hydra:runtime.cwd}/img/rgb${img.bits}bit/${img.name}.ppm
 height: 512
 width: 512
 plot: False
 crop_mode: "resize-crop"
 save_gt: False
-bits: 16

@@ -13,6 +13,29 @@ from utils.data import load_img
 from hurry.filesize import size as hurry_size
 
 
+def _plot_image_dict(img_dict, x_key: str, y_key: str, path: Path):
+    _label_dict = {"psnr": "PSNR (in dB)", "quality": "Quality", "size": "Size (in KB)"}
+    # plt.figure(figsize=(8, 8))
+    for img_name in img_dict:
+        plt.plot(
+            img_dict[img_name][x_key],
+            img_dict[img_name][y_key],
+            linestyle="--",
+            marker="o",
+        )
+
+    plt.xlabel(_label_dict[x_key])
+    plt.ylabel(_label_dict[y_key])
+    # plt.title(f"JPEG {y_key.capitalize()} vs {x_key.capitalize()}")
+    plt.legend(img_dict.keys())
+    plt.grid()
+    plt.savefig(
+        path / f"jpeg_{y_key}_vs_{x_key}.pdf",
+        dpi=150,
+    )
+    plt.show()
+
+
 @hydra.main(config_name="config", config_path="../conf")
 def main(cfg: DictConfig):
     print(OmegaConf.to_yaml(cfg))
@@ -60,50 +83,11 @@ def main(cfg: DictConfig):
             size = dump_file.stat().st_size
             size_ll.append(size // 1024)
 
-        img_dict[img_name] = {"psnr": psnr_ll, "size": size_ll}
+        img_dict[img_name] = {"psnr": psnr_ll, "size": size_ll, "quality": quality_ll}
 
-    # plt.figure(figsize=(8, 8))
-    for img_name in img_dict:
-        plt.plot(quality_ll, img_dict[img_name]["psnr"], linestyle="--", marker="o")
-
-    plt.xlabel("Quality")
-    plt.ylabel("PSNR (in dB)")
-    # plt.title("JPEG Quality vs PSNR")
-    plt.legend(img_dict.keys())
-    plt.savefig(
-        path / "jpeg_psnr_vs_quality.pdf",
-        dpi=150,
-    )
-    plt.show()
-
-    for img_name in img_dict:
-        plt.plot(quality_ll, img_dict[img_name]["size"], linestyle="--", marker="o")
-    plt.xlabel("Quality")
-    plt.ylabel("Size (in KB)")
-    # plt.title("JPEG Quality vs Size")
-    plt.legend(img_dict.keys())
-    plt.savefig(
-        path / "jpeg_size_vs_quality.pdf",
-        dpi=150,
-    )
-    plt.show()
-
-    for img_name in img_dict:
-        plt.plot(
-            img_dict[img_name]["size"],
-            img_dict[img_name]["psnr"],
-            linestyle="--",
-            marker="o",
-        )
-    plt.xlabel("Size (in KB)")
-    plt.ylabel("PSNR (in dB)")
-    # plt.title("JPEG Quality vs Size")
-    plt.legend(img_dict.keys())
-    plt.savefig(
-        path / "jpeg_psnr_vs_size.pdf",
-        dpi=150,
-    )
-    plt.show()
+    _plot_image_dict(img_dict, "quality", "psnr", path)
+    _plot_image_dict(img_dict, "quality", "size", path)
+    _plot_image_dict(img_dict, "size", "psnr", path)
 
 
 if __name__ == "__main__":

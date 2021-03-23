@@ -134,7 +134,6 @@ def main(cfg: DictConfig):
 
             # W&B logs
             if cfg.wandb.use:
-                img_name = Path(cfg.img.path).name
                 _log_dict = {
                     "train_loss": train_loss,
                     "test_loss": test_loss,
@@ -142,7 +141,7 @@ def main(cfg: DictConfig):
                     "image": [
                         wandb.Image(
                             pred.permute(2, 0, 1).detach(),
-                            caption=img_name,
+                            caption=cfg.img.name,
                         )
                     ],
                 }
