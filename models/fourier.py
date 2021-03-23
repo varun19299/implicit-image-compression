@@ -34,9 +34,13 @@ class FourierNet(nn.Module):
         hidden_size: int = 128,
         map_size: int = 128,
         map_scale: float = 10.0,
+        small_dense_density: float = 1.0,
         **kwargs,
     ):
         super().__init__()
+
+        # Small Dense
+        hidden_size = int(hidden_size * np.sqrt(small_dense_density))
 
         # mapping to hidden, first layer
         layers = [nn.Linear(map_size, hidden_size)]

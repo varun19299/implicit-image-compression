@@ -20,9 +20,14 @@ class WaveletSiren(nn.Module):
         hidden_omega_0: float = 50.0,
         outermost_linear: bool = True,
         simulate_quantization: bool = False,
+        small_dense_density: float = 1.0,
         **kwargs
     ):
         super().__init__()
+
+        # Small Dense
+        hidden_size = int(hidden_size * np.sqrt(small_dense_density))
+
         self.output_size = output_size
         self.wavelet_levels = wavelet_levels
         self.wavelet_windows = 3

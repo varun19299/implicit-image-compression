@@ -2,7 +2,7 @@ defaults:
   - img: flower_16bit
   - hydra
   - mlp: siren
-  - override hydra/launcher: joblib_launcher
+  - override hydra/launcher: basic_launcher
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
 

@@ -73,7 +73,7 @@ def setup_mask(
     :param masking_cfg: cfg.masking (if present)
     :return: Masking instance
     """
-    if masking_cfg:
+    if masking_cfg and not masking_cfg.dense:
         if masking_cfg.decay_schedule == "magnitude-prune":
             kwargs = {
                 "final_sparsity": 1 - masking_cfg.final_density,
@@ -92,7 +92,7 @@ def setup_mask(
         mask = Masking(
             optim,
             decay,
-            input_size=(1, 2),
+            input_size=(1, 1, 2),
             density=masking_cfg.density,
             dense_gradients=masking_cfg.dense_gradients,
             sparse_init=masking_cfg.sparse_init,

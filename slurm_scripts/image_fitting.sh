@@ -49,7 +49,17 @@ fi
 #+masking=RigL masking.density=0.5 \
 #train.multiplier=5 train.save_weights=True
 
+# RigL
 python main.py \
 exp_name='${mlp.name}-${mlp.hidden_size}_${img.name}_train_${train.multiplier}x' \
-img=bridge_16bit,building_16bit \
+img=flower_16bit,bridge_16bit,building_16bit \
++masking=RigL masking.density=0.75,0.5,0.2,0.1,0.05 \
 mlp.hidden_size=128 train.multiplier=5 -m
+
+# Pruning
+
+# Small Dense
+
+# FeatherMap
+
+

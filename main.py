@@ -1,7 +1,9 @@
 # Standard Libraries
 import logging
 import os
-from pathlib import Path
+
+# Torch imports
+import torch
 
 # Other 3rd party imports
 import hydra
@@ -9,9 +11,7 @@ import wandb
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
-# Torch imports
-import torch
-import torch.nn.functional as F
+from feathermap.feathernet import FeatherNet
 
 # Modules
 from models import registry as model_registry
@@ -41,7 +41,15 @@ def main(cfg: DictConfig):
     _, _, c = grid.shape
     logging.info(f"Grid of shape {grid.shape}")
 
-    model = model_registry[cfg.mlp.name](**cfg.mlp)
+    # Small Dense: lower params with a "narrow" MLP
+    _small_density = 1.0
+    if cfg.get("masking") and cfg.masking.name == "Small_Dense":
+        _small_density = cfg.masking.density
+    model = model_registry[cfg.mlp.name](**cfg.mlp, small_dense_density=_small_density)
+
+    # Feathermap: hashing based compression
+    if cfg.get("masking") and cfg.masking.name == "Feathermap":
+        model = FeatherNet(model, compress=cfg.masking.density)
 
     # Send to device
     model = model.to(device)
@@ -63,17 +71,6 @@ def main(cfg: DictConfig):
         )
         wandb.watch(model)
 
-    # Training multiplier
-    training_multiplier = cfg.train.multiplier
-    cfg.train.num_steps *= training_multiplier
-
-    if cfg.get("masking"):
-        cfg.masking.end_when *= training_multiplier
-        cfg.masking.end_when = int(cfg.masking.end_when)
-
-        cfg.masking.interval *= training_multiplier
-        cfg.masking.interval = int(cfg.masking.interval)
-
     # Train
     model.train()
     optim = torch.optim.Adam(model.parameters(), lr=cfg.train.learning_rate)
@@ -82,6 +79,19 @@ def main(cfg: DictConfig):
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 2000, gamma=0.5)
     train_kwargs = {"lr_scheduler": lr_scheduler}
     eval_kwargs = {}
+
+    # Training multiplier
+    training_multiplier = cfg.train.multiplier
+    cfg.train.num_steps *= training_multiplier
+
+    if cfg.get("masking"):
+        if cfg.masking.get("end_when"):
+            cfg.masking.end_when *= training_multiplier
+            cfg.masking.end_when = int(cfg.masking.end_when)
+
+        if cfg.masking.get("interval"):
+            cfg.masking.interval *= training_multiplier
+            cfg.masking.interval = int(cfg.masking.interval)
 
     # tqdm
     pbar = tqdm(total=cfg.train.num_steps, dynamic_ncols=True)
