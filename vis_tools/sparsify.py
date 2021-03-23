@@ -25,7 +25,7 @@ def get_stats_table(
     """
     Get stats saved on W&B.
 
-    List all possible choices for (masking, init, density, dataset).
+    List all possible choices for (image, masking, density, suffix).
 
     We'll try matching the exhaustive caretesian product of
     (masking_ll x init_ll x suffix_ll x density_ll etc).
@@ -34,6 +34,7 @@ def get_stats_table(
     :param masking_ll: List of sparse training techniques
     :param density_ll: List of density values (1 - sparsity)
     :param image_ll: List of images
+    :param suffix_ll: List of suffixes
     :param reorder: sort methods alphabetically
 
     :return: Dataframe containing test accuracies of methods
