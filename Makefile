@@ -21,7 +21,7 @@ setup_zsh:
 
 colab_install: setup_zsh install
 
-help : Makefile
+help : Makefile makefiles/*.mk
     ifeq ($(UNAME_S),Linux)
 		@sed -ns -e '$$a\\' -e 's/^##//p' $^
     endif
@@ -50,5 +50,7 @@ prune:
 	+masking=$(MASKING) masking.density=$(DENSITY) train.multiplier=$(TRAIN_MUL) \
  	exp_name='$${masking.name}_$${masking.density}_trainx_$${train.multiplier}' \
  	$(KWARGS) $(HYDRA_FLAGS)
+
+include makefiles/*.mk
 
 all: siren prune
