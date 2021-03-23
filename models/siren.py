@@ -5,6 +5,7 @@ import numpy as np
 from dataclasses import dataclass
 from einops import rearrange
 
+
 @dataclass(eq=False, repr=False)
 class SineLayer(nn.Module):
     """
@@ -125,4 +126,10 @@ class Siren(nn.Module):
         x = self.layers(x) / 2 + 0.5
 
         h, w, _ = grid.shape
-        return rearrange(x, "(h w) c -> h w c", h=h, w= w)
+        return rearrange(x, "(h w) c -> h w c", h=h, w=w)
+
+
+if __name__ == "__main__":
+    from torchsummary import summary
+
+    summary(Siren(), input_size=(10, 2))

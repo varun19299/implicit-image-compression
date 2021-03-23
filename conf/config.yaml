@@ -2,11 +2,11 @@ defaults:
   - img: flower_16bit
   - hydra
   - mlp: siren
-  - override hydra/launcher: basic_launcher
+  - override hydra/launcher: joblib_launcher
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
 
-exp_name: image_fitting
+exp_name: ${mlp.name}_${img.name}
 seed: 0
 device: cuda # cpu or cuda
 

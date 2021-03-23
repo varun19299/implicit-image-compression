@@ -59,6 +59,7 @@ class FourierNet(nn.Module):
         x = rearrange(grid, "h w c -> (h w) c")
 
         x = self.encoding(x)
+        x = self.layers(x)
 
         h, w, _ = grid.shape
         return rearrange(x, "(h w) c -> h w c", h=h, w=w)
