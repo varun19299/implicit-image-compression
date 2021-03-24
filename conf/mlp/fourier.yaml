@@ -1,6 +1,6 @@
 # @package mlp
 name: fourier
 depth: 8
-hidden_size: 256
-map_size: ${mlp.hidden_size}
-map_scale: 32
+hidden_size: 128
+map_size: 256
+map_scale: 16

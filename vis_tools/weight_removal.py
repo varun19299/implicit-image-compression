@@ -127,14 +127,16 @@ def sparsity_plot(
                     sub_df["PSNR"],
                     color=color,
                     label=label,
+                    marker="o",
                     linewidth=linewidth,
                     alpha=alpha,
                 )
 
         xticks = [0.25, 0.5, 0.8, 0.9, 0.95]
-        plt.xticks(xticks, [f"{xtick * 100:.0f}" for xtick in xticks])
-        plt.xlabel("Weight %")
+        plt.xticks(xticks, [f"{(1 - xtick) * 100:.0f}" for xtick in xticks])
+        plt.xlabel("% of Original Weights")
         plt.ylabel("PSNR (in dB)")
+        plt.ylim(13, 45)
         plt.legend(loc="lower left")
         plt.grid()
         plt.tight_layout()
