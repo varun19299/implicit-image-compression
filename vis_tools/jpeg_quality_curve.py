@@ -11,6 +11,21 @@ from pathlib import Path
 import time
 from utils.data import load_img
 from hurry.filesize import size as hurry_size
+import json
+
+# Matplotlib font sizes
+TINY_SIZE = 8
+SMALL_SIZE = 12
+MEDIUM_SIZE = 14
+BIGGER_SIZE = 18
+
+plt.rc("font", size=SMALL_SIZE)  # controls default text sizes
+plt.rc("axes", titlesize=SMALL_SIZE)  # fontsize of the axes title
+plt.rc("axes", labelsize=BIGGER_SIZE)  # fontsize of the x and y labels
+plt.rc("xtick", labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc("ytick", labelsize=SMALL_SIZE)  # fontsize of the tick labels
+plt.rc("legend", fontsize=MEDIUM_SIZE)  # legend fontsize
+plt.rc("figure", titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
 def _plot_image_dict(img_dict, x_key: str, y_key: str, path: Path):
@@ -29,6 +44,7 @@ def _plot_image_dict(img_dict, x_key: str, y_key: str, path: Path):
     # plt.title(f"JPEG {y_key.capitalize()} vs {x_key.capitalize()}")
     plt.legend(img_dict.keys())
     plt.grid()
+    plt.tight_layout()
     plt.savefig(
         path / f"jpeg_{y_key}_vs_{x_key}.pdf",
         dpi=150,
@@ -88,6 +104,15 @@ def main(cfg: DictConfig):
     _plot_image_dict(img_dict, "quality", "psnr", path)
     _plot_image_dict(img_dict, "quality", "size", path)
     _plot_image_dict(img_dict, "size", "psnr", path)
+
+    # Convert to list
+    for name in img_dict:
+        for metric, metric_ll in img_dict[name].items():
+            if isinstance(metric_ll, np.ndarray):
+                img_dict[name][metric] = metric_ll.tolist()
+
+    with open(path.parent / "csv" / "jpeg_dump.json", "w") as f:
+        json.dump(img_dict, f, indent=4, sort_keys=True)
 
 
 if __name__ == "__main__":

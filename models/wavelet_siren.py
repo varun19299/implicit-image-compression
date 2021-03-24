@@ -6,6 +6,7 @@ from utils.data import get_grid
 from einops import rearrange
 from pytorch_wavelets import DWTInverse, DWTForward
 import kornia
+import numpy as np
 
 
 class WaveletSiren(nn.Module):
