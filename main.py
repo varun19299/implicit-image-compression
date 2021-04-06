@@ -12,12 +12,19 @@ from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
 from feathermap.feathernet import FeatherNet
+from compress import DeepCompressor
 
 # Modules
 from models import registry as model_registry
 from utils.catch_error import catch_error_decorator
 from utils.data import load_img, get_grid
-from utils.train_helper import eval_epoch, get_device, setup_mask, train_epoch
+from utils.train_helper import (
+    eval_epoch,
+    get_device,
+    setup_mask,
+    train_epoch,
+    get_optimizer_lr_scheduler,
+)
 
 
 @catch_error_decorator
@@ -73,10 +80,7 @@ def main(cfg: DictConfig):
 
     # Train
     model.train()
-    optim = torch.optim.Adam(model.parameters(), lr=cfg.train.learning_rate)
-
-    # empirically, step lr (cut by 5 after 1k steps) should be better
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 2000, gamma=0.5)
+    optim, lr_scheduler = get_optimizer_lr_scheduler(model, cfg.optim)
     train_kwargs = {"lr_scheduler": lr_scheduler}
     eval_kwargs = {}
 
@@ -107,6 +111,17 @@ def main(cfg: DictConfig):
         context = torch.cuda.amp.autocast
         train_kwargs.update({"scaler": scaler, "context": context})
         eval_kwargs.update({"context": context})
+
+    # attach a global qconfig, which contains information about what kind
+    # of observers to attach. Use 'fbgemm' for server inference and
+    # 'qnnpack' for mobile inference. Other quantization configurations such
+    # as selecting symmetric or assymetric quantization and MinMax or L2Norm
+    # calibration techniques can be specified here.
+    model.qconfig = torch.quantization.get_default_qat_qconfig("fbgemm")
+
+    # Prepare the model for QAT. This inserts observers and fake_quants in
+    # the model that will observe weight and activation tensors during calibration.
+    model = torch.quantization.prepare_qat(model)
 
     for i in range(cfg.train.num_steps):
         train_loss = train_epoch(
@@ -163,6 +178,70 @@ def main(cfg: DictConfig):
                         }
                     )
                 wandb.log(_log_dict, step=i + 1)
+
+    model.eval()
+    model_int8 = torch.quantization.convert(model)
+    pred, test_loss, test_PSNR = eval_epoch(model_int8, grid, img, **eval_kwargs)
+    print(test_PSNR)
+
+    if cfg.compress:
+        compress = DeepCompressor(model, optim, bits=8)
+
+        # tqdm
+        pbar = tqdm(total=100, dynamic_ncols=True)
+        train_kwargs.update({"pbar": pbar})
+
+        # AMP
+        if cfg.train.mixed_precision:
+            scaler = torch.cuda.amp.GradScaler()
+            context = torch.cuda.amp.autocast
+            train_kwargs.update({"scaler": scaler, "context": context})
+            eval_kwargs.update({"context": context})
+
+        for i in range(100):
+            train_loss = train_epoch(
+                i,
+                model,
+                optim,
+                grid,
+                img,
+                **train_kwargs,
+            )
+
+            # Evaluate
+            if (i + 1) % 10 == 0:
+                pred, test_loss, test_PSNR = eval_epoch(model, grid, img, **eval_kwargs)
+
+                # pbar update
+                msg = [
+                    f"Compress Step: {i + 1}",
+                    f"Train loss: {train_loss:.4f}",
+                    f"Test loss: {test_loss:.4f}",
+                    f"Test PSNR: {test_PSNR:.3f}",
+                ]
+
+                if mask:
+                    msg += [f"Mask Prune Rate {mask.prune_rate:.5f}"]
+
+                msg = " | ".join(msg)
+                pbar.set_description(msg)
+                logging.info(msg)
+
+                # W&B logs
+                # if cfg.wandb.use:
+                #     _log_dict = {
+                #         "train_loss": train_loss,
+                #         "test_loss": test_loss,
+                #         "test_PSNR": test_PSNR,
+                #         "image": [
+                #             wandb.Image(
+                #                 pred.permute(2, 0, 1).detach(),
+                #                 caption=cfg.img.name,
+                #             )
+                #         ],
+                #     }
+                #     wandb.log(_log_dict, step=i + 1)
+        compress.update_weights()
 
     # Save weights
     if cfg.train.save_weights:

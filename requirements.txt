@@ -1,6 +1,6 @@
 black
 einops
-torch>=1.6
+
 kornia
 hurry.filesize
 
@@ -19,6 +19,9 @@ matplotlib
 numpy
 opencv-python
 pyyaml>=5.4
+
+torch>=1.6
+torch_optimizer
 tqdm
 
 # WandB joblib patch

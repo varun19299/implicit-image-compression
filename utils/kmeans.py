@@ -2,8 +2,14 @@ import math
 import torch
 from time import time
 import numpy as np
+from dataclasses import dataclass
+
+from matplotlib import pyplot as plt
+
+from typing import Union
 
 
+@dataclass
 class KMeans:
     """
     Kmeans clustering algorithm implemented with PyTorch
@@ -24,35 +30,18 @@ class KMeans:
       mode: {'euclidean', 'cosine'}, default: 'euclidean'
         Type of distance measure
 
-      minibatch: {None, int}, default: None
-        Batch size of MinibatchKmeans algorithm
-        if None perform full KMeans algorithm
-
     Attributes:
-      centroids: torch.Tensor, shape: [n_clusters, n_features]
-        cluster centroids
+      cluster_centers_: torch.Tensor, shape: [n_clusters, n_features]
     """
 
-    def __init__(
-        self,
-        n_clusters,
-        centroids=None,
-        max_iter=100,
-        tol=0.0001,
-        verbose=0,
-        mode="euclidean",
-        minibatch=None,
-    ):
-        self.n_clusters = n_clusters
-        self.centroids = centroids
-        self.max_iter = max_iter
-        self.tol = tol
-        self.verbose = verbose
-        self.mode = mode
-        self.minibatch = minibatch
-        self._loop = False
-        self._show = False
+    n_clusters: int
+    init: Union[str, torch.Tensor] = "random"
+    max_iter: int = 100
+    tol: float = 1e-4
+    verbose: int = 0
+    mode: str = "euclidean"
 
+    def __post_init__(self):
         try:
             import PYNVML
 
@@ -119,6 +108,7 @@ class KMeans:
         """
         device = a.device.type
         batch_size = a.shape[0]
+
         if self.mode == "cosine":
             sim_func = self.cos_sim
         elif self.mode == "euclidean":
@@ -130,12 +120,16 @@ class KMeans:
             return max_sim_v, max_sim_i
         else:
             if a.dtype == torch.float:
-                expected = a.shape[0] * a.shape[1] * b.shape[0] * 4
+                # 32 bits or 4 bytes per float (full precision)
+                expected_memory = a.shape[0] * a.shape[1] * b.shape[0] * 4
             elif a.dtype == torch.half:
-                expected = a.shape[0] * a.shape[1] * b.shape[0] * 2
-            ratio = math.ceil(expected / self.remaining_memory())
+                # 32 bits or 4 bytes per float (half precision)
+                expected_memory = a.shape[0] * a.shape[1] * b.shape[0] * 2
+
+            ratio = math.ceil(expected_memory / self.remaining_memory())
             subbatch_size = math.ceil(batch_size / ratio)
             msv, msi = [], []
+
             for i in range(ratio):
                 if i * subbatch_size >= batch_size:
                     continue
@@ -152,7 +146,7 @@ class KMeans:
                 max_sim_i = torch.cat(msi, dim=0)
             return max_sim_v, max_sim_i
 
-    def fit_predict(self, X, centroids=None):
+    def fit_predict(self, X):
         """
         Combination of fit() and predict() methods.
         This is faster than calling fit() and predict() seperately.
@@ -160,61 +154,49 @@ class KMeans:
         Parameters:
         X: torch.Tensor, shape: [n_samples, n_features]
 
-        centroids: {torch.Tensor, None}, default: None
-          if given, centroids will be initialized with given tensor
-          if None, centroids will be randomly chosen from X
+        cluster_centers_: {torch.Tensor, None}, default: None
+          if given, cluster_centers_ will be initialized with given tensor
+          if None, cluster_centers_ will be randomly chosen from X
 
         Return:
         labels: torch.Tensor, shape: [n_samples]
         """
         batch_size, emb_dim = X.shape
         device = X.device.type
-        start_time = time()
-        if centroids is None:
-            self.centroids = X[
+
+        if self.init == "random":
+            self.cluster_centers_ = X[
                 np.random.choice(batch_size, size=[self.n_clusters], replace=False)
             ]
+        elif isinstance(self.init, torch.Tensor):
+            n_samp, n_feat = X.shape
+            assert self.init.shape == (
+                self.n_clusters,
+                n_feat,
+            ), f"Shape mismatch in init, expected {(self.n_clusters, n_feat)}, got {self.init.shape}"
+            self.cluster_centers_ = self.init
+
         else:
-            self.centroids = centroids
+            print("Currently only random and guess init allowed")
+            raise
+
         num_points_in_clusters = torch.ones(self.n_clusters, device=device)
         closest = None
         for i in range(self.max_iter):
             iter_time = time()
-            if self.minibatch is not None:
-                x = X[
-                    np.random.choice(batch_size, size=[self.minibatch], replace=False)
-                ]
-            else:
-                x = X
-            closest = self.max_sim(a=x, b=self.centroids)[1]
+            x = X
+            closest = self.max_sim(a=x, b=self.cluster_centers_)[1]
             matched_clusters, counts = closest.unique(return_counts=True)
 
-            c_grad = torch.zeros_like(self.centroids)
-            if self._loop:
-                for j, count in zip(matched_clusters, counts):
-                    c_grad[j] = x[closest == j].sum(dim=0) / count
-            else:
-                if self.minibatch is None:
-                    expanded_closest = closest[None].expand(self.n_clusters, -1)
-                    mask = (
-                        expanded_closest
-                        == torch.arange(self.n_clusters, device=device)[:, None]
-                    ).float()
-                    c_grad = mask @ x / mask.sum(-1)[..., :, None]
-                    c_grad[c_grad != c_grad] = 0  # remove NaNs
-                else:
-                    expanded_closest = closest[None].expand(len(matched_clusters), -1)
-                    mask = (expanded_closest == matched_clusters[:, None]).float()
-                    c_grad[matched_clusters] = mask @ x / mask.sum(-1)[..., :, None]
+            c_grad = torch.zeros_like(self.cluster_centers_)
+            expanded_closest = closest[None].expand(len(matched_clusters), -1)
+            mask = (expanded_closest == matched_clusters[:, None]).float()
+            c_grad[matched_clusters] = mask @ x / mask.sum(-1)[..., :, None]
 
-            error = (c_grad - self.centroids).pow(2).sum()
-            if self.minibatch is not None:
-                lr = 1 / num_points_in_clusters[:, None] * 0.9 + 0.1
-                # lr = 1/num_points_in_clusters[:,None]**0.1
-            else:
-                lr = 1
+            error = (c_grad - self.cluster_centers_).pow(2).sum()
+
             num_points_in_clusters[matched_clusters] += counts
-            self.centroids = self.centroids * (1 - lr) + c_grad * lr
+            self.cluster_centers_ = c_grad
             if self.verbose >= 2:
                 print(
                     "iter:",
@@ -227,23 +209,6 @@ class KMeans:
             if error <= self.tol:
                 break
 
-        # SCATTER
-        if self._show:
-            if self.mode is "cosine":
-                sim = self.cos_sim(x, self.centroids)
-            elif self.mode is "euclidean":
-                sim = self.euc_sim(x, self.centroids)
-            closest = sim.argmax(dim=-1)
-            plt.scatter(
-                X[:, 0].cpu(), X[:, 1].cpu(), c=closest.cpu(), marker=".", cmap="hsv"
-            )
-            # plt.scatter(c[:,0].cpu(), c[:,1].cpu(), marker='o', cmap='red')
-            plt.show()
-        # END SCATTER
-        if self.verbose >= 1:
-            print(
-                f"used {i+1} iterations ({round(time()-start_time, 4)}s) to cluster {batch_size} items into {self.n_clusters} clusters"
-            )
         return closest
 
     def predict(self, X):
@@ -256,13 +221,28 @@ class KMeans:
         Return:
         labels: torch.Tensor, shape: [n_samples]
         """
-        return self.max_sim(a=X, b=self.centroids)[1]
+        return self.max_sim(a=X, b=self.cluster_centers_)[1]
 
-    def fit(self, X, centroids=None):
+    def fit(self, X):
         """
         Perform kmeans clustering
 
         Parameters:
         X: torch.Tensor, shape: [n_samples, n_features]
         """
-        self.fit_predict(X, centroids)
+        self.fit_predict(X)
+        return self
+
+    def fit_append_0_predict(self, X):
+        """
+        Perform kmeans clustering
+        Add 0 to the centroid
+        Predict
+
+        Parameters:
+        X: torch.Tensor, shape: [n_samples, n_features]
+        """
+        self.fit_predict(X)
+        prepend = torch.zeros_like(self.cluster_centers_)[:1]
+        self.cluster_centers_ = torch.cat((prepend, self.cluster_centers_))
+        return self.predict(X)

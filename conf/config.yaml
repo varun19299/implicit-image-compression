@@ -2,6 +2,7 @@ defaults:
   - img: flower_16bit
   - hydra
   - mlp: siren
+  - optim: adam
   - override hydra/launcher: basic_launcher
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
@@ -13,13 +14,15 @@ device: cuda # cpu or cuda
 
 train:
   log_iters: 100
-  learning_rate: 3e-4
   num_steps: 2000
   batch_height: ${img.height}
   batch_width: ${img.width}
   save_weights: False
   multiplier: 1
-  mixed_precision: True
+  mixed_precision: False
+
+compress: {}
+masking: {}
 
 wandb:
   use: True

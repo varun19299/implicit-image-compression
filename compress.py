@@ -3,9 +3,10 @@ from sklearn.cluster import KMeans
 from utils.kmeans import KMeans as KMeans_torch
 import numpy as np
 import torch.nn as nn
+from typing import List
 
-from dataclasses import dataclass
-from einops import rearrange
+from dataclasses import dataclass, field
+from einops import rearrange, repeat
 
 
 @dataclass
@@ -33,6 +34,10 @@ class DeepCompressor:
     # k means clusters = 2**bits
     bits: int = 5
 
+    skip_ll: List = field(
+        default_factory=lambda: ["layers.0.linear", "layers.7.linear"]
+    )
+
     def __post_init__(self):
         self.forward_pre_hook_ll = []
         self.backward_hook_ll = []
@@ -58,8 +63,6 @@ class DeepCompressor:
         return self.optim.defaults["lr"]
 
     def kmeans_modify_weight(self, module, input):
-        device = module.weight.data.device
-
         # kmeans_cluster
         centroids, labeled_weight, new_weight = self.find_centroids(module.weight)
 
@@ -73,61 +76,53 @@ class DeepCompressor:
             hook.remove()
 
         for layer, (name, module) in enumerate(self.model.named_modules()):
-            weight = module.weight.data.cpu().numpy()
-            device = weight.data.device
+            if name in self.skip_ll:
+                continue
+            if isinstance(module, nn.Linear):
+                centroids = module.centroids
+                labeled_weight = module.labeled_weight
 
-            centroids = module.centroids
-            labeled_weight = module.labeled_weight
+                # Drop centroids into labels
+                new_weight = self.labels_to_weights(labeled_weight, centroids)
+                module.weight.data = new_weight
 
-            # Drop centroids into labels
-            new_weight = self.labels_to_weights(labeled_weight, centroids)
-            new_weight = new_weight.reshape(*weight.shape, dtype=np.int8)
+                del module.labeled_weight
 
-            module.weight = torch.from_numpy(new_weight).to(device)
-            del module.labeled_weight
+    def find_centroids(self, weight: torch.nn.Parameter):
+        weight = weight.data
+        device = weight.device
+        shape = weight.shape
+        dtype = weight.dtype
 
-    def find_centroids(self, weight):
-        device = weight.data.device
-        weight_np = weight.data  # .cpu().numpy()
-        weight_np = weight_np.reshape(-1, 1)
+        # rehape
+        weight = weight.reshape(-1, 1)
 
         # Exclude zeros
-        weight_nonzero = weight_np[weight_np != 0].reshape(-1, 1)
+        weight_nonzero = weight[weight != 0].reshape(-1, 1)
 
         # Linear guess
-        # guess = np.linspace(
-        #     weight_nonzero.min(),
-        #     weight_nonzero.max(),
-        #     self.n_clusters - 1,
-        #     dtype=np.float32,
-        # )
         guess = torch.linspace(
             weight_nonzero.min(),
             weight_nonzero.max(),
             self.n_clusters - 1,
+            device=device,
+            dtype=dtype,
+        ).reshape(-1, 1)
+
+        kmeans = KMeans_torch(n_clusters=self.n_clusters - 1, init=guess).fit(
+            weight_nonzero
         )
-        guess = guess.reshape(-1, 1)
-
-        # kmeans = KMeans(
-        #     n_clusters=self.n_clusters - 1, init=guess, random_state=0, n_init=1
-        # ).fit(weight_nonzero)
-
-        kmeans = KMeans_torch(
-            n_clusters=self.n_clusters - 1,
-            centroids=guess,
-        ).fit(weight_nonzero)
-        centroids = kmeans.cluster_centers_
 
         # Append 0.0 as a centroid
-        centroids = np.append(0.0, centroids)
-        kmeans.cluster_centers_ = rearrange(centroids, "n -> n 1").astype(np.float32)
+        centroids = kmeans.cluster_centers_
+        prepend = torch.zeros_like(centroids)[:1]
+        centroids = torch.cat((prepend, centroids))
 
-        labels = kmeans.predict(weight_np)
+        labels = kmeans.predict(weight).reshape(*shape)
 
         # Drop centroids into labels
+        centroids = rearrange(centroids, "n 1-> n")
         new_weight = self.labels_to_weights(labels, centroids)
-        new_weight = new_weight.reshape(*weight.shape)
-        new_weight = torch.from_numpy(new_weight).float().to(device)
 
         return centroids, labels, new_weight
 
@@ -139,17 +134,19 @@ class DeepCompressor:
         :param centroids: code book
         :return:
         """
-        new_weight = np.zeros(shape=labeled_weight.shape, dtype=np.float32)
-        for index, label in enumerate(labeled_weight):
-            new_weight[index] = centroids[label]
-        return labeled_weight
+        new_weight = centroids[labeled_weight]
+        return new_weight
 
     def get_centroids_gradients(self, grad_input, labeled_weight, centroids):
-        dw = np.zeros(shape=centroids.shape, dtype=np.float32)
-        w_grad = grad_input[2].t().data.cpu().numpy()
-        grad_w = w_grad.reshape(-1, 1)
-        for index, label in enumerate(labeled_weight):
-            dw[label] += grad_w[index]
+        dw = torch.zeros_like(centroids)
+
+        w_grad = grad_input[2].t().data
+
+        w_grad = torch.flatten(w_grad)
+        labeled_weight = torch.flatten(labeled_weight)
+
+        dw.scatter_add_(0, labeled_weight, w_grad)
+
         return dw
 
     def scalar_quantization(self, module, grad_input, grad_output):
@@ -166,24 +163,44 @@ if __name__ == "__main__":
     from utils.timer import catchtime
 
     model = Siren()
+    in_shape = (5, 5, 2)
+    n_iters = 5
+
+    if torch.cuda.is_available():
+        model = model.cuda()
+
+    def _loop(model, in_shape, n_iters: int = 5, backward: bool = False):
+        for _ in range(n_iters):
+            in_tensor = torch.rand(*in_shape)
+            if torch.cuda.is_available():
+                in_tensor = in_tensor.cuda()
+
+            if backward:
+                model(in_tensor).sum().backward()
+            else:
+                model(in_tensor)
+
+    print(f"Reporting average of {n_iters} runs each.")
 
     # w/o kmeans
     with catchtime() as t:
-        model(torch.rand(5, 5, 2))
-    print(f"Timing without kMeans {t()}")
+        _loop(model, in_shape, n_iters)
+    print(f"\nTiming without kMeans {t() / n_iters}")
 
     with catchtime() as t:
-        model(torch.rand(5, 5, 2)).sum().backward()
-    print(f"Backward without kMeans {t()}")
+        _loop(model, in_shape, n_iters, backward=True)
+    print(f"Backward without kMeans {t() / n_iters}")
 
     optim = torch.optim.Adam(model.parameters(), lr=1e-3)
     comp = DeepCompressor(model, optim)
 
     # w kmeans
     with catchtime() as t:
-        model(torch.rand(5, 5, 2))
-    print(f"\nTiming with kMeans {t()}")
+        _loop(model, in_shape, n_iters)
+    print(f"\nTiming with kMeans {t() / n_iters}")
 
     with catchtime() as t:
-        model(torch.rand(5, 5, 2)).sum().backward()
-    print(f"Backward with kMeans {t()}")
+        _loop(model, in_shape, n_iters, backward=True)
+    print(f"Backward with kMeans {t() / n_iters}")
+
+    comp.update_weights()

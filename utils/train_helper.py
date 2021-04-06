@@ -5,7 +5,10 @@ import torch
 from omegaconf import DictConfig
 from torch.nn import Module, functional as F
 from torch.optim import Optimizer
-from torch.utils.data import DataLoader
+
+# More optimizers
+import torch_optimizer
+from optim.lars import LARS
 
 from sparselearning.core import Masking
 from sparselearning.funcs.decay import registry as decay_registry
@@ -61,6 +64,23 @@ def get_device(device_str: str) -> torch.device:
         return torch.device(device_str)
     else:
         return torch.device("cpu")
+
+
+def get_optimizer_lr_scheduler(
+    model: Module, optim_cfg: Dict
+) -> Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler._LRScheduler]:
+    optim_dict = {
+        "adam": torch.optim.Adam,
+        "lars": LARS,
+        "shampoo": torch_optimizer.Shampoo,
+    }
+
+    optim = optim_dict[optim_cfg.name](model.parameters(), lr=optim_cfg.learning_rate)
+
+    # empirically, step lr (cut by 5 after 1k steps) should be better
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 2000, gamma=0.5)
+
+    return optim, lr_scheduler
 
 
 def setup_mask(
