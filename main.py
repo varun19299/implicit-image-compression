@@ -166,7 +166,8 @@ def main(cfg: DictConfig):
 
         # tqdm
         pbar = tqdm(total=cfg.quant.num_steps, dynamic_ncols=True)
-        train_kwargs.update({"pbar": pbar})
+        train_kwargs.update({"pbar": pbar, "mask": mask})
+
 
         with quant_context.Quantize(model, optim, cfg.quant) as q:
             for i in range(cfg.train.num_steps):

@@ -65,7 +65,7 @@ class KmeansQuant:
 
     def kmeans_modify_weight(self, module, input):
         # kmeans_cluster
-        centroids, labeled_weight, new_weight = self.find_centroids(module.weight)
+        centroids, labeled_weight, new_weight = self.find_centroids(module)
 
         module.labeled_weight = labeled_weight
         module.centroids = centroids
@@ -89,8 +89,8 @@ class KmeansQuant:
 
                 del module.labeled_weight
 
-    def find_centroids(self, weight: torch.nn.Parameter):
-        weight = weight.data
+    def find_centroids(self, module: nn.Module):
+        weight = module.weight.data
         device = weight.device
         shape = weight.shape
         dtype = weight.dtype
@@ -102,16 +102,21 @@ class KmeansQuant:
         weight_nonzero = weight[weight != 0].reshape(-1, 1)
 
         # Linear guess
-        guess = torch.linspace(
-            weight_nonzero.min(),
-            weight_nonzero.max(),
-            self.n_clusters - 1,
-            device=device,
-            dtype=dtype,
-        ).reshape(-1, 1)
-        # Append 0.0 as a centroid
-        prepend = torch.zeros_like(guess)[:1]
-        guess = torch.cat((prepend, guess))
+        if not hasattr(module, "centroids"):
+            # Linear guess
+            guess = torch.linspace(
+                weight_nonzero.min(),
+                weight_nonzero.max(),
+                self.n_clusters - 1,
+                device=device,
+                dtype=dtype,
+            ).reshape(-1, 1)
+
+            # Append 0.0 as a centroid
+            prepend = torch.zeros_like(guess)[:1]
+            guess = torch.cat((prepend, guess))
+        else:
+            guess = module.centroids
 
         kmeans = KMeans_torch(n_clusters=self.n_clusters, init=guess)
 
@@ -148,6 +153,7 @@ class KmeansQuant:
         return dw
 
     def scalar_quantization(self, module, grad_input, grad_output):
+        # TODO: Is this even needed? Centroids are re-computed in the forward pass.
         labeled_weight = module.labeled_weight
         centroids = module.centroids
         dw = self.get_centroids_gradients(grad_input, labeled_weight, centroids)
