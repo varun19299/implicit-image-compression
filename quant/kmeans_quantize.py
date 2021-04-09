@@ -1,16 +1,15 @@
-import torch
-from sklearn.cluster import KMeans
-from utils.kmeans import KMeans as KMeans_torch
-import numpy as np
-import torch.nn as nn
+from dataclasses import dataclass, field
 from typing import List
 
-from dataclasses import dataclass, field
-from einops import rearrange, repeat
+import torch
+import torch.nn as nn
+from einops import rearrange
+
+from quant.kmeans import KMeans as KMeans_torch
 
 
 @dataclass
-class DeepCompressor:
+class KmeansQuant:
     """
     Implements quantization technique used in
 
@@ -43,6 +42,8 @@ class DeepCompressor:
         self.backward_hook_ll = []
 
         for name, module in self.model.named_modules():
+            if name in self.skip_ll:
+                continue
             if isinstance(module, nn.Linear):
                 # Before a forward
                 forward_pre_hook = module.register_forward_pre_hook(
@@ -108,17 +109,14 @@ class DeepCompressor:
             device=device,
             dtype=dtype,
         ).reshape(-1, 1)
-
-        kmeans = KMeans_torch(n_clusters=self.n_clusters - 1, init=guess).fit(
-            weight_nonzero
-        )
-
         # Append 0.0 as a centroid
-        centroids = kmeans.cluster_centers_
-        prepend = torch.zeros_like(centroids)[:1]
-        centroids = torch.cat((prepend, centroids))
+        prepend = torch.zeros_like(guess)[:1]
+        guess = torch.cat((prepend, guess))
 
-        labels = kmeans.predict(weight).reshape(*shape)
+        kmeans = KMeans_torch(n_clusters=self.n_clusters, init=guess)
+
+        labels = kmeans.fit_predict(weight).reshape(*shape)
+        centroids = kmeans.cluster_centers_
 
         # Drop centroids into labels
         centroids = rearrange(centroids, "n 1-> n")
@@ -192,7 +190,7 @@ if __name__ == "__main__":
     print(f"Backward without kMeans {t() / n_iters}")
 
     optim = torch.optim.Adam(model.parameters(), lr=1e-3)
-    comp = DeepCompressor(model, optim)
+    comp = KmeansQuant(model, optim)
 
     # w kmeans
     with catchtime() as t:

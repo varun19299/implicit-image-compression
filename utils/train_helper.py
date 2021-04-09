@@ -6,10 +6,6 @@ from omegaconf import DictConfig
 from torch.nn import Module, functional as F
 from torch.optim import Optimizer
 
-# More optimizers
-import torch_optimizer
-from optim.lars import LARS
-
 from sparselearning.core import Masking
 from sparselearning.funcs.decay import registry as decay_registry
 
@@ -71,8 +67,6 @@ def get_optimizer_lr_scheduler(
 ) -> Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler._LRScheduler]:
     optim_dict = {
         "adam": torch.optim.Adam,
-        "lars": LARS,
-        "shampoo": torch_optimizer.Shampoo,
     }
 
     optim = optim_dict[optim_cfg.name](model.parameters(), lr=optim_cfg.learning_rate)
@@ -140,10 +134,11 @@ def train_epoch(
     scaler = kwargs.get("scaler")
 
     model.train()
+    optim.zero_grad()
 
+    # Forward pass
     with context():
         pred = model(grid)
-
         # Any callable
         train_loss = criterion(
             pred,
@@ -165,7 +160,6 @@ def train_epoch(
             # Unscales gradients and calls
             # or skips optimizer.step()
             scaler.step(optim)
-
             # Updates the scale for next iteration
             scaler.update()
         else:

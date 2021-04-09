@@ -117,6 +117,9 @@ class Siren(nn.Module):
             )
         )
 
+        self.simulate_quantization = simulate_quantization
+        # self.quant = torch.quantization.QuantStub()
+        # self.dequant = torch.quantization.DeQuantStub()
         self.layers = nn.Sequential(*layers)
 
     def forward(self, grid: torch.Tensor):
@@ -126,8 +129,14 @@ class Siren(nn.Module):
         # 0...1 -> -1...1
         x = (x - 0.5) * 2
 
+        # if self.simulate_quantization:
+        #     x = self.quant(x)
+
         # -1...1 -> 0...1
         x = self.layers(x) / 2 + 0.5
+
+        # if self.simulate_quantization:
+        #     x = self.dequant(x)
 
         h, w, _ = grid.shape
         return rearrange(x, "(h w) c -> h w c", h=h, w=w)

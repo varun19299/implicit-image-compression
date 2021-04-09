@@ -21,7 +21,7 @@ train:
   multiplier: 1
   mixed_precision: False
 
-compress: {}
+quant: {}
 masking: {}
 
 wandb:
