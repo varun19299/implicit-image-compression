@@ -26,6 +26,7 @@ from utils.train_helper import (
 )
 
 from quant import context as quant_context
+import encoding.zstandard
 
 
 @catch_error_decorator
@@ -161,24 +162,18 @@ def main(cfg: DictConfig):
                 wandb.log(_log_dict, step=i + 1)
 
     if cfg.quant:
-        optim, lr_scheduler = get_optimizer_lr_scheduler(model, cfg.optim)
+        optim, lr_scheduler = get_optimizer_lr_scheduler(
+            model, cfg.optim, quantize_mode=True
+        )
         train_kwargs = {"lr_scheduler": lr_scheduler}
 
         # tqdm
         pbar = tqdm(total=cfg.quant.num_steps, dynamic_ncols=True)
-        train_kwargs.update({"pbar": pbar, "mask": mask})
-
+        train_kwargs.update({"pbar": pbar, "mask": mask})  #
 
         with quant_context.Quantize(model, optim, cfg.quant) as q:
             for i in range(cfg.train.num_steps):
-                train_epoch(
-                    i,
-                    model,
-                    optim,
-                    grid,
-                    img,
-                    **train_kwargs,
-                )
+                train_epoch(i, model, optim, grid, img, **train_kwargs)
 
                 # Evaluate
                 if (i + 1) % cfg.train.log_iters == 0:
@@ -196,24 +191,24 @@ def main(cfg: DictConfig):
                     pbar.set_description(msg)
                     logging.info(msg)
 
-                    # W&B logs
-                    if cfg.wandb.use:
-                        _log_dict = {
-                            "compress_loss": compress_loss,
-                            "compress_PSNR": compress_PSNR,
-                            "compress_image": [
-                                wandb.Image(
-                                    pred.permute(2, 0, 1).detach(),
-                                    caption=cfg.img.name,
-                                )
-                            ],
-                        }
-                        wandb.log(_log_dict, step=i + 1)
-
         quantized_model = q.convert()
-        pred, test_loss, test_PSNR = eval_epoch(
+        pred, compress_loss, compress_PSNR = eval_epoch(
             quantized_model, grid, img, **eval_kwargs
         )
+
+        # W&B logs
+        if cfg.wandb.use:
+            _log_dict = {
+                "compress_loss": compress_loss,
+                "compress_PSNR": compress_PSNR,
+                "compress_image": [
+                    wandb.Image(
+                        pred.permute(2, 0, 1).detach(),
+                        caption=cfg.img.name,
+                    )
+                ],
+            }
+            wandb.log(_log_dict)
 
         # pbar update
         msg = [
@@ -230,6 +225,8 @@ def main(cfg: DictConfig):
             "state_dict": model.state_dict(),
         }
         torch.save(state, "model.pth")
+
+        encoding.zstandard.compress_state_dict(quantized_model, "model.cpth", level=22)
 
     # Close wandb context
     if cfg.wandb.use:

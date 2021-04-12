@@ -29,7 +29,8 @@ class Quantize:
         return torch.quantization.convert(self.model.eval().cpu())
 
     def _convert_KMeans(self):
-        return self.compress.update_weights()
+        self.compress.update_weights()
+        return self.model
 
     def _prepare_QAT(self):
         # attach a global qconfig, which contains information about what kind

@@ -20,8 +20,8 @@ numpy
 opencv-python
 pyyaml>=5.4
 
-torch>=1.6
-torch_optimizer
+torch>=1.7
+torchtyping
 tqdm
 
 # WandB joblib patch

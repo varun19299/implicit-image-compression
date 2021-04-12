@@ -116,7 +116,7 @@ class KmeansQuant:
             prepend = torch.zeros_like(guess)[:1]
             guess = torch.cat((prepend, guess))
         else:
-            guess = module.centroids
+            guess = rearrange(module.centroids, "n -> n 1")
 
         kmeans = KMeans_torch(n_clusters=self.n_clusters, init=guess)
 
@@ -144,6 +144,9 @@ class KmeansQuant:
         dw = torch.zeros_like(centroids)
 
         w_grad = grad_input[2].t().data
+
+        # Mask gradients
+        # w_grad = w_grad * (labeled_weight > 0)
 
         w_grad = torch.flatten(w_grad)
         labeled_weight = torch.flatten(labeled_weight)

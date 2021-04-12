@@ -63,7 +63,7 @@ def get_device(device_str: str) -> torch.device:
 
 
 def get_optimizer_lr_scheduler(
-    model: Module, optim_cfg: Dict
+    model: Module, optim_cfg: Dict, quantize_mode: bool = False
 ) -> Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler._LRScheduler]:
     optim_dict = {
         "adam": torch.optim.Adam,
@@ -71,8 +71,11 @@ def get_optimizer_lr_scheduler(
 
     optim = optim_dict[optim_cfg.name](model.parameters(), lr=optim_cfg.learning_rate)
 
-    # empirically, step lr (cut by 5 after 1k steps) should be better
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 2000, gamma=0.5)
+    if quantize_mode:
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 1000, gamma=0.5)
+    else:
+        # empirically, step lr (cut by 5 after 1k steps) should be better
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 2000, gamma=0.5)
 
     return optim, lr_scheduler
 
