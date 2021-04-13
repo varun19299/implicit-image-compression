@@ -5,11 +5,17 @@ kornia
 hurry.filesize
 
 # Hydra Dependencies
-git+https://github.com/facebookresearch/hydra.git#egg=hydra-ax-sweeper&subdirectory=plugins/hydra_ax_sweeper
-git+https://github.com/facebookresearch/hydra.git#egg=hydra_colorlog&subdirectory=plugins/hydra_colorlog
-git+https://github.com/facebookresearch/hydra.git
-git+https://github.com/facebookresearch/hydra.git#egg=hydra-joblib-launcher&subdirectory=plugins/hydra_joblib_launcher
-git+https://github.com/facebookresearch/hydra.git#egg=hydra-optuna-sweeper&subdirectory=plugins/hydra_optuna_sweeper
+--pre
+hydra-core
+hydra-optuna-sweeper
+hydra-joblib-launcher
+hydra_colorlog
+
+# git+https://github.com/facebookresearch/hydra.git#egg=hydra-ax-sweeper&subdirectory=plugins/hydra_ax_sweeper
+# git+https://github.com/facebookresearch/hydra.git#egg=hydra_colorlog&subdirectory=plugins/hydra_colorlog
+# git+https://github.com/facebookresearch/hydra.git
+# git+https://github.com/facebookresearch/hydra.git#egg=hydra-joblib-launcher&subdirectory=plugins/hydra_joblib_launcher
+# git+https://github.com/facebookresearch/hydra.git#egg=hydra-optuna-sweeper&subdirectory=plugins/hydra_optuna_sweeper
 
 # Pytorch Wavelets
 PyWavelets
@@ -20,9 +26,13 @@ numpy
 opencv-python
 pyyaml>=5.4
 
-torch>=1.7
+torch>=1.8
 torchtyping
 tqdm
+
+# Edit accordingly
+--find-links https://pytorch-geometric.com/whl/torch-1.8.0+cu110.html
+torch_scatter
 
 # WandB joblib patch
 # See: https://github.com/wandb/client/issues/1525#issuecomment-749346781

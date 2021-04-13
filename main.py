@@ -8,6 +8,7 @@ import torch
 # Other 3rd party imports
 import hydra
 import wandb
+from copy import deepcopy
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
@@ -26,7 +27,7 @@ from utils.train_helper import (
 )
 
 from quant import context as quant_context
-import encoding.zstandard
+import entropy_coding.zstd
 
 
 @catch_error_decorator
@@ -162,23 +163,27 @@ def main(cfg: DictConfig):
                 wandb.log(_log_dict, step=i + 1)
 
     if cfg.quant:
+        # Model
+        quantized_model = deepcopy(model)
+
         optim, lr_scheduler = get_optimizer_lr_scheduler(
-            model, cfg.optim, quantize_mode=True
+            quantized_model, cfg.optim, quantize_mode=True
         )
+        eval_kwargs = {}
         train_kwargs = {"lr_scheduler": lr_scheduler}
 
         # tqdm
         pbar = tqdm(total=cfg.quant.num_steps, dynamic_ncols=True)
-        train_kwargs.update({"pbar": pbar, "mask": mask})  #
+        train_kwargs.update({"pbar": pbar, "mask": mask})
 
-        with quant_context.Quantize(model, optim, cfg.quant) as q:
-            for i in range(cfg.train.num_steps):
-                train_epoch(i, model, optim, grid, img, **train_kwargs)
+        with quant_context.Quantize(quantized_model, optim, cfg.quant) as q:
+            for i in range(cfg.quant.num_steps):
+                train_epoch(i, quantized_model, optim, grid, img, **train_kwargs)
 
                 # Evaluate
-                if (i + 1) % cfg.train.log_iters == 0:
+                if (i + 1) % 50 == 0:
                     pred, compress_loss, compress_PSNR = eval_epoch(
-                        model, grid, img, **eval_kwargs
+                        quantized_model, grid, img, **eval_kwargs
                     )
 
                     # pbar update
@@ -191,6 +196,7 @@ def main(cfg: DictConfig):
                     pbar.set_description(msg)
                     logging.info(msg)
 
+        # Evaluate final model
         quantized_model = q.convert()
         pred, compress_loss, compress_PSNR = eval_epoch(
             quantized_model, grid, img, **eval_kwargs
@@ -221,12 +227,17 @@ def main(cfg: DictConfig):
 
     # Save weights
     if cfg.train.save_weights:
-        state = {
-            "state_dict": model.state_dict(),
-        }
-        torch.save(state, "model.pth")
+        torch.save({"state_dict": model.state_dict()}, "model.pth")
 
-        encoding.zstandard.compress_state_dict(quantized_model, "model.cpth", level=22)
+        if cfg.train.mixed_precision:
+            torch.save({"state_dict": model.half().state_dict()}, "model_half.pth")
+
+        if cfg.train.mixed_precision:
+            quantized_model = quantized_model.half()
+
+        entropy_coding.zstd.compress_state_dict(
+            quantized_model, "model_quantized.cpth", level=22
+        )
 
     # Close wandb context
     if cfg.wandb.use:

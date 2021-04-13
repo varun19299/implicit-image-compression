@@ -1,17 +1,43 @@
-import zstandard as zstd
+import zstandard
 import torch
 from torch import nn
 from typing import BinaryIO
+import numpy as np
 
 from utils import file_handler
-from encoding import utils as encoding_utils
+from utils.train_helper import reduce_tensor_storage
+from entropy_coding import utils as encoding_utils
 from collections import OrderedDict
 from scipy.sparse import csc_matrix
 
 from zipfile import ZipFile
 from pathlib import Path
-from typing import Union
+from typing import Dict, Union
 import json
+
+
+def linear_state_dict(model: nn.Module) -> Dict[str, np.ndarray]:
+    """
+    Extract only linear layers
+
+    If quantized, store labels + centroids
+    :param model:
+    :return:
+    """
+    state_dict = model.cpu().state_dict()
+
+    for name, module in model.named_modules():
+        if isinstance(module, nn.Linear):
+            if hasattr(module, "centroids") and hasattr(module, "labeled_weight"):
+                state_dict.pop(f"{name}.weight")
+                state_dict[f"{name}.labeled_weight"] = state_dict[
+                    f"{name}.labeled_weight"
+                ].to(torch.uint8)
+
+    # for name, tensor in state_dict.items():
+    #     state_dict[name] = reduce_tensor_storage(tensor)
+
+    return state_dict
 
 
 def compress_state_dict(
@@ -28,10 +54,9 @@ def compress_state_dict(
     :param level:
     :return:
     """
-    cctx = zstd.ZstdCompressor(level=level)
+    cctx = zstandard.ZstdCompressor(level=level)
 
-    model = model.to(torch.device("cpu"))
-    state_dict = model.state_dict()
+    state_dict = linear_state_dict(model)
     meta_data = OrderedDict()
 
     if isinstance(file_name, str):
@@ -40,14 +65,26 @@ def compress_state_dict(
     binary_file_name = file_name.parent / f"{file_name.stem}.data"
 
     with file_handler.open_file_like(binary_file_name, "wb") as opened_handler:
-        with cctx.stream_writer(opened_handler) as compressor:
+        with cctx.stream_writer(opened_handler, write_size=1000000) as compressor:
             for e, (name, tensor) in enumerate(state_dict.items()):
                 array = tensor.numpy()
+                print(name, array.dtype)
 
                 # Convert to CSC only if
                 # sparsity crosses 50%
                 if encoding_utils.sparsity(array) > 0.5:
+                    # compressor.write(array)
+                    # info_dict = {
+                    #     "shape": array.shape,
+                    #     "dtype": str(array.dtype),
+                    #     "order": e,
+                    # }
+                    # meta_data[name] = info_dict
+
                     sparse_array = csc_matrix(array, dtype=array.dtype)
+                    sparse_array.indices = sparse_array.indices.astype(np.uint8)
+                    sparse_array.indptr = sparse_array.indptr.astype(np.uint8)
+
                     for attribute in ["data", "indices", "indptr"]:
                         sparse_rep = getattr(sparse_array, attribute)
                         compressor.write(sparse_rep)
@@ -59,7 +96,6 @@ def compress_state_dict(
                         }
                         meta_data[f"{name}_{attribute}"] = info_dict
                 else:
-                    array = tensor.numpy()
                     compressor.write(array)
                     info_dict = {
                         "shape": array.shape,
@@ -84,5 +120,5 @@ def compress_state_dict(
     return compressed_bytes
 
 
-def decompress_state_dict(model: nn.Module, file_handler: BinaryIO):
+def decompress_state_dict(model: nn.Module, file_name: Union[str, Path]):
     pass

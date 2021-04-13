@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from einops import rearrange
 
-from quant.kmeans import KMeans as KMeans_torch
+from quant.kmeans import kmeans_fit, kmeans_predict
 
 
 @dataclass
@@ -19,7 +19,7 @@ class KmeansQuant:
     by Han et al., ICLR 2016s.
 
     * K Mean clustering for quantization
-    * Huffman encoding for entropy based lossless compression
+    * Huffman entropy_coding for entropy based lossless compression
 
     Idea:
 
@@ -83,11 +83,30 @@ class KmeansQuant:
                 centroids = module.centroids
                 labeled_weight = module.labeled_weight
 
+                # Sort
+                # _, indices = torch.sort(torch.abs(centroids))
+                # centroids = centroids[indices]
+                # labeled_weight = indices[labeled_weight]
+
+                # Set as params
+                module.centroids = nn.Parameter(centroids, requires_grad=False)
+                module.labeled_weight = nn.Parameter(
+                    labeled_weight, requires_grad=False
+                )
+
                 # Drop centroids into labels
                 new_weight = self.labels_to_weights(labeled_weight, centroids)
                 module.weight.data = new_weight
 
+                # del module.labeled_weight
+
+    def remove_labels_centroids(self):
+        for layer, (name, module) in enumerate(self.model.named_modules()):
+            if name in self.skip_ll:
+                continue
+            if isinstance(module, nn.Linear):
                 del module.labeled_weight
+                del module.centroids
 
     def find_centroids(self, module: nn.Module):
         weight = module.weight.data
@@ -102,7 +121,8 @@ class KmeansQuant:
         weight_nonzero = weight[weight != 0].reshape(-1, 1)
 
         # Linear guess
-        if not hasattr(module, "centroids"):
+        # if not hasattr(module, "centroids"):
+        if True:
             # Linear guess
             guess = torch.linspace(
                 weight_nonzero.min(),
@@ -112,16 +132,30 @@ class KmeansQuant:
                 dtype=dtype,
             ).reshape(-1, 1)
 
-            # Append 0.0 as a centroid
-            prepend = torch.zeros_like(guess)[:1]
-            guess = torch.cat((prepend, guess))
+            # # Append 0.0 as a centroid
+            # prepend = torch.zeros_like(guess)[:1]
+            # guess = torch.cat((prepend, guess))
         else:
-            guess = rearrange(module.centroids, "n -> n 1")
+            # guess = rearrange(module.centroids, "n -> n 1")
+            guess = rearrange(module.centroids[1:], "n -> n 1")
 
-        kmeans = KMeans_torch(n_clusters=self.n_clusters, init=guess)
+        labels, centroids = kmeans_fit(
+            weight_nonzero, num_clusters=self.n_clusters - 1, cluster_centers=guess
+        )
 
-        labels = kmeans.fit_predict(weight).reshape(*shape)
-        centroids = kmeans.cluster_centers_
+        # Append 0.0 as a centroid
+        prepend = torch.zeros_like(centroids)[:1]
+        centroids = torch.cat((prepend, centroids))
+        # Keep only unique centroids
+        centroids = torch.unique(centroids)
+        _, indices = torch.sort(centroids.abs())
+        centroids = rearrange(centroids[indices], "n -> n 1")
+
+        labels = kmeans_predict(weight, centroids).reshape(*shape)
+
+        # kmeans = KMeans_torch(n_clusters=self.n_clusters, init=guess)
+        # labels = kmeans.fit_predict(weight).reshape(*shape)
+        # centroids = kmeans.cluster_centers_
 
         # Drop centroids into labels
         centroids = rearrange(centroids, "n 1-> n")
@@ -144,10 +178,6 @@ class KmeansQuant:
         dw = torch.zeros_like(centroids)
 
         w_grad = grad_input[2].t().data
-
-        # Mask gradients
-        # w_grad = w_grad * (labeled_weight > 0)
-
         w_grad = torch.flatten(w_grad)
         labeled_weight = torch.flatten(labeled_weight)
 
@@ -211,3 +241,4 @@ if __name__ == "__main__":
     print(f"Backward with kMeans {t() / n_iters}")
 
     comp.update_weights()
+    comp.remove_labels_centroids()

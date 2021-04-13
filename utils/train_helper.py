@@ -15,9 +15,9 @@ def _blank_context():
     yield
 
 
-def compress_indices(state_dict: Dict) -> Dict:
+def reduce_tensor_storage(tensor: torch.Tensor) -> torch.Tensor:
     """
-    Compresses index tensors of sparse matrices (using int8/16/32).
+    Reduce tensor storage (using int8/16/32).
     :param state_dict: MLPs state dict
     :return: a compressed version
     """
@@ -32,11 +32,9 @@ def compress_indices(state_dict: Dict) -> Dict:
         else:
             return torch.int64
 
-    for key in state_dict.keys():
-        if "indices" in key:
-            state_dict[key] = state_dict[key].to(highest_precision(state_dict[key]))
-
-    return state_dict
+    if type(torch.flatten(tensor)[0].item) == int:
+        tensor = tensor.to(highest_precision(tensor))
+    return tensor
 
 
 @torch.no_grad()

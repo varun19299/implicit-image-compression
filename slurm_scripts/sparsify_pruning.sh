@@ -26,7 +26,7 @@ echo "== Time limit: ${SBATCH_TIMELIMIT}"
 nvidia-smi
 
 # Conda stuff
-module load cuda/10.2 anaconda/wml
+module load cuda/11.1 anaconda/wml
 source ~/.zshrc
 conda activate torch1.7_py38
 
