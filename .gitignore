@@ -1,13 +1,13 @@
 outputs/*
 wandb_api.key
-__pycache__/
 *idea*
 .vscode/*
 
 # DIV2K images are too big
 img/rgb*/*
 
-
+__pycache__*
 Icon*
 *.pth
 *.pyc
+implicit_image.egg-info
