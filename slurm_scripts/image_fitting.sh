@@ -42,7 +42,7 @@ fi
 # Start Job here
 #make siren
 
-#python main.py \
+#python compress.py \
 #exp_name='siren_depth_${mlp.depth}_amp_quant_density_${masking.density}_trainx_${train.multiplier}' \
 #mlp.depth=4 train.mixed_precision=True \
 #mlp.simulate_quantization=True \

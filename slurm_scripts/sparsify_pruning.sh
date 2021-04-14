@@ -48,7 +48,7 @@ fi
 # FeatherMap
 
 #if [ ${2} == "flower" ]; then
-#python main.py \
+#python compress.py \
 #  exp_name='${img.name}_${masking.name}_${masking.final_density}_train_${train.multiplier}x' \
 #  img=flower_16bit \
 #  +masking=${1} masking.final_density=0.75,0.5,0.2,0.1,0.05 \
@@ -57,7 +57,7 @@ fi
 #fi
 #
 #if [ ${2} == "bridge" ]; then
-#  python main.py \
+#  python compress.py \
 #    exp_name='${img.name}_${masking.name}_${masking.final_density}_train_${train.multiplier}x' \
 #    img=bridge_16bit \
 #    +masking=${1} masking.final_density=0.75,0.5,0.2,0.1,0.05 \
@@ -66,7 +66,7 @@ fi
 #fi
 #
 #if [ ${2} == "building" ]; then
-#  python main.py \
+#  python compress.py \
 #    exp_name='${img.name}_${masking.name}_${masking.final_density}_train_${train.multiplier}x' \
 #    img=building_16bit \
 #    +masking=${1} masking.final_density=0.75,0.5,0.2,0.1,0.05 \
