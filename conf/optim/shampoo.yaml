@@ -1,0 +1,7 @@
+# @package optim
+name: shampoo
+lr: 1e-1
+momentum: 0.9
+weight_decay: 0
+epsilon: 1e-4
+update_freq: 1

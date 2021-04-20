@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from implicit_image.pipeline.feathermap import FeatherNet
 from implicit_image.pipeline.quant import context as quant_context
-from implicit_image.pipeline.entropy_coding import zstd
+from implicit_image.pipeline import entropy_coding
 
 # Modules
 from implicit_image.models import registry as model_registry
@@ -115,7 +115,7 @@ def main(cfg: DictConfig):
         eval_kwargs.update({"context": context})
 
     for i in range(cfg.train.num_steps):
-        train_epoch(i, model, optim, grid, img, **train_kwargs)
+        train_epoch(model, optim, grid, img, **train_kwargs)
 
         # Apply mask
         if mask and i <= cfg.masking.end_when:
@@ -123,7 +123,7 @@ def main(cfg: DictConfig):
                 mask.update_connections()
 
         # Evaluate
-        if (i + 1) % cfg.train.log_iters == 0:
+        if (i + 1) % cfg.train.log_steps == 0:
             pred, test_loss, test_PSNR = eval_epoch(model, grid, img, **eval_kwargs)
 
             # pbar update
@@ -177,7 +177,7 @@ def main(cfg: DictConfig):
 
         with quant_context.Quantize(quantized_model, optim, cfg.quant) as q:
             for i in range(cfg.quant.num_steps):
-                train_epoch(i, quantized_model, optim, grid, img, **train_kwargs)
+                train_epoch(quantized_model, optim, grid, img, **train_kwargs)
 
                 # Evaluate
                 if (i + 1) % 50 == 0:
@@ -217,7 +217,7 @@ def main(cfg: DictConfig):
 
         # pbar update
         msg = [
-            f"Eval Compress Step: {i + 1}",
+            f"Eval Compress Step: {cfg.train.num_steps}",
             f"loss: {test_loss:.4f}",
             f"PSNR: {test_PSNR:.3f}",
         ]
@@ -231,13 +231,16 @@ def main(cfg: DictConfig):
         if cfg.train.mixed_precision:
             torch.save({"state_dict": model.half().state_dict()}, "model_half.pth")
 
-        if cfg.train.mixed_precision:
+        if cfg.quant:
             quantized_model = quantized_model.half()
 
-        compressed_bytes = zstd.compress_state_dict(
-            quantized_model, "model_quantized.cpth", level=22
-        )
-        print(f"Compressed bytes {compressed_bytes}")
+        if cfg.entropy_coding:
+            compressed_bytes = entropy_coding.compress_state_dict(
+                quantized_model, "model_quantized", **cfg.entropy_coding
+            )
+            msg = f"Compressed bytes {compressed_bytes}"
+            print(msg)
+            logging.info(msg)
 
     # Close wandb context
     if cfg.wandb.use:

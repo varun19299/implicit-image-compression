@@ -1,0 +1,3 @@
+# @package entropy_coding
+stream_name: zstd
+level: 22

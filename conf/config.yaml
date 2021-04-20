@@ -1,8 +1,8 @@
 defaults:
   - img: flower_16bit
-  - hydra
   - mlp: siren
   - optim: adam
+  - hydra # hydra stuff
   - override hydra/launcher: basic_launcher
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
@@ -11,18 +11,18 @@ exp_name: ${mlp.name}_${img.name}
 seed: 0
 device: cuda # cpu or cuda
 
+entropy_coding: {}
+masking: {}
+quant: {}
 
 train:
-  log_iters: 400
   num_steps: 2000
+  log_steps: 400
   batch_height: ${img.height}
   batch_width: ${img.width}
-  save_weights: False
-  multiplier: 1
-  mixed_precision: False
-
-quant: {}
-masking: {}
+  save_weights: True
+  multiplier: 1   # for extended training
+  mixed_precision: True  # Using pytorch's amp
 
 wandb:
   use: True

@@ -137,8 +137,8 @@ class Masking(object):
     optimizer: "optim"
     prune_rate_decay: "Decay"
 
-    density: float = 0.1  # Sparsity = 1 - density
-    sparse_init: str = "random"  # see sparsify/funcs/init_scheme.py
+    density: float = 0.2  # Sparsity = 1 - density
+    sparse_init: str = "random"  # see masking/funcs/init_scheme.py
 
     # If sparse (not dense),
     # grads are masked
@@ -653,7 +653,7 @@ class Masking(object):
     def sparsify(self, **kwargs):
         """
         Call sparsity init func
-        (see sparsify/funcs/init_scheme.py)
+        (see masking/funcs/init_scheme.py)
         """
         init_registry[self.sparse_init](self, **kwargs)
 

@@ -74,7 +74,7 @@ class Siren(nn.Module):
         input_size: int = 2,
         output_size: int = 3,
         depth: int = 8,
-        hidden_size: int = 256,
+        hidden_size: int = 128,
         first_omega_0: float = 50.0,
         hidden_omega_0: float = 50.0,
         outermost_linear: bool = True,

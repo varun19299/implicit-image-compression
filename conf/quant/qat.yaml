@@ -1,4 +1,6 @@
 # @package quant
 name: QAT
 qconfig: fbgemm
-num_steps: 2000
+
+num_steps: 50
+log_steps: 10

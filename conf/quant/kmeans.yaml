@@ -1,6 +1,9 @@
 # @package quant
 name: KMeans
+
 num_steps: 50
+log_steps: 10
+
 bits: 8
 skip_ll:
   - layers.0.linear

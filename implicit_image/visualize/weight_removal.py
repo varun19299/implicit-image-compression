@@ -1,7 +1,7 @@
 """
 Run as:
 
-python visualize/weight_removal.py wandb.project=sparsify
+python visualize/weight_removal.py wandb.project=masking
 """
 import itertools
 import logging

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=sparsify    # create a short name for your job
+#SBATCH --job-name=masking    # create a short name for your job
 
 #SBATCH --partition=batch_default   # use batch_default, or wacc for quick (< 30 min) ones
 
@@ -52,7 +52,7 @@ fi
 #  exp_name='${img.name}_${masking.name}_${masking.final_density}_train_${train.multiplier}x' \
 #  img=flower_16bit \
 #  +masking=${1} masking.final_density=0.75,0.5,0.2,0.1,0.05 \
-#  wandb.project=sparsify \
+#  wandb.project=masking \
 #  train.multiplier=5 -m
 #fi
 #
@@ -61,7 +61,7 @@ fi
 #    exp_name='${img.name}_${masking.name}_${masking.final_density}_train_${train.multiplier}x' \
 #    img=bridge_16bit \
 #    +masking=${1} masking.final_density=0.75,0.5,0.2,0.1,0.05 \
-#    wandb.project=sparsify \
+#    wandb.project=masking \
 #    mlp.hidden_size=256 train.multiplier=5 -m
 #fi
 #
@@ -70,7 +70,7 @@ fi
 #    exp_name='${img.name}_${masking.name}_${masking.final_density}_train_${train.multiplier}x' \
 #    img=building_16bit \
 #    +masking=${1} masking.final_density=0.75,0.5,0.2,0.1,0.05 \
-#    wandb.project=sparsify \
+#    wandb.project=masking \
 #    mlp.hidden_size=256 train.multiplier=5 -m
 #fi
 

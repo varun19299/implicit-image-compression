@@ -5,9 +5,10 @@ import torch
 from omegaconf import DictConfig
 from torch.nn import Module, functional as F
 from torch.optim import Optimizer
+from torch_optimizer import Shampoo
 
-from ..pipeline.sparsify import Masking
-from ..pipeline.sparsify.funcs.decay import registry as decay_registry
+from ..pipeline.masking import Masking
+from ..pipeline.masking.funcs.decay import registry as decay_registry
 
 
 @contextmanager
@@ -65,9 +66,11 @@ def get_optimizer_lr_scheduler(
 ) -> Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler._LRScheduler]:
     optim_dict = {
         "adam": torch.optim.Adam,
+        "shampoo": Shampoo,
     }
 
-    optim = optim_dict[optim_cfg.name](model.parameters(), lr=optim_cfg.learning_rate)
+    kwargs = {k: v for k, v in optim_cfg.items() if k != "name"}
+    optim = optim_dict[optim_cfg.name](model.parameters(), **kwargs)
 
     if quantize_mode:
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 1000, gamma=0.5)
@@ -121,14 +124,13 @@ def setup_mask(
         return mask
 
 
-def train_epoch(
-    epoch: int, model: Module, optim: Optimizer, grid, img, **kwargs
-) -> float:
+def train_epoch(model: Module, optim: Optimizer, grid, img, **kwargs) -> float:
     # Unpack
     mask: Masking = kwargs.get("mask")
     pbar = kwargs.get("pbar")
     lr_scheduler = kwargs.get("lr_scheduler")
     criterion = kwargs.get("criterion", F.mse_loss)
+    preconditioner = kwargs.get("preconditioner")
 
     # Automatic mixed precision
     context = kwargs.get("criterion", _blank_context)
@@ -153,6 +155,9 @@ def train_epoch(
     else:
         train_loss.backward()
 
+    if preconditioner:
+        preconditioner.step()
+
     if mask:
         # If mask, pass the scalar to it
         mask.step(scaler)
@@ -166,8 +171,9 @@ def train_epoch(
         else:
             optim.step()
 
-    # Update pbar
-    pbar.update(1)
+    if pbar:
+        # Update pbar
+        pbar.update(1)
 
     if lr_scheduler:
         lr_scheduler.step()
