@@ -342,7 +342,7 @@ class Masking(object):
             i += 1
 
         if i == 1000:
-            print(
+            logging.debug(
                 f"Error resolving the residual! Layers are too full! Residual left over: {residual}"
             )
 

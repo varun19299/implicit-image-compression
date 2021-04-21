@@ -10,7 +10,7 @@ from scipy.sparse import csc_matrix
 from torch import nn
 
 from implicit_image.pipeline.entropy_coding import utils as encoding_utils
-from implicit_image.pipeline.entropy_coding.plain import NumpyParser
+from implicit_image.pipeline.entropy_coding.parsers import NumpyParser, LZMAParser
 
 
 def linear_state_dict(model: nn.Module) -> Dict[str, torch.Tensor]:
@@ -42,6 +42,8 @@ def get_stream_writer(name: str, **kwargs):
         return zstandard.ZstdCompressor(level=kwargs["level"]).stream_writer
     elif name == "plain":
         return NumpyParser
+    elif name == "lzma":
+        return LZMAParser
     elif name == "huffman":
         return
     else:
@@ -53,6 +55,8 @@ def get_stream_reader(name: str, **kwargs):
         return zstandard.ZstdDecompressor().stream_reader
     elif name == "plain":
         return NumpyParser
+    elif name == "lzma":
+        return LZMAParser
     elif name == "huffman":
         return
     else:

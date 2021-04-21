@@ -3,7 +3,7 @@ hydra:
   run:
     dir: ./outputs/${img.name}/${exp_name}/${hydra.job.override_dirname}
   sweep:
-    dir: ./outputs/${img.name}${exp_name}/
+    dir: ./outputs/${img.name}/${exp_name}/
     subdir: ${hydra.job.override_dirname}
   job_logging:
     root:
@@ -15,3 +15,5 @@ hydra:
         exclude_keys:
           - exp_name
           - img.name
+          - wandb.name
+          - wandb.project

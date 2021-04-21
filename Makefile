@@ -38,7 +38,7 @@ EXP_NAME := flower_16bit
 
 ## fit: Implicit MLP image fitting
 siren:
-	${PYTHON} main.py \
+	${PYTHON} implicit_image/compress.py \
  	exp_name=$(EXP_NAME) \
  	$(KWARGS) $(HYDRA_FLAGS)
 
@@ -46,7 +46,7 @@ MASKING := RigL
 DENSITY := 0.5
 TRAIN_MUL := 5
 prune:
-	${PYTHON} main.py \
+	${PYTHON} implicit_image/compress.py \
 	+masking=$(MASKING) masking.density=$(DENSITY) train.multiplier=$(TRAIN_MUL) \
  	exp_name='$${masking.name}_$${masking.density}_trainx_$${train.multiplier}' \
  	$(KWARGS) $(HYDRA_FLAGS)

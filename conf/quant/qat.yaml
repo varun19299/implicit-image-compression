@@ -2,5 +2,5 @@
 name: QAT
 qconfig: fbgemm
 
-num_steps: 50
+num_steps: 100
 log_steps: 10

@@ -1,7 +1,10 @@
 defaults:
-  - img: flower_16bit
+  - img: flower
   - mlp: siren
   - optim: adam
+  - masking: RigL
+  - quant: kmeans
+  - entropy_coding: plain
   - hydra # hydra stuff
   - override hydra/launcher: basic_launcher
   - override hydra/job_logging: colorlog
@@ -10,10 +13,6 @@ defaults:
 exp_name: ${mlp.name}_${img.name}
 seed: 0
 device: cuda # cpu or cuda
-
-entropy_coding: {}
-masking: {}
-quant: {}
 
 train:
   num_steps: 2000

@@ -4,6 +4,7 @@ import os
 
 # Torch imports
 import torch
+from typing import Dict
 
 # Other 3rd party imports
 import hydra
@@ -27,6 +28,25 @@ from implicit_image.utils.train_helper import (
     train_epoch,
     get_optimizer_lr_scheduler,
 )
+
+
+def file_and_wandb_logger(
+    label: str, step: int, log_dict: Dict, pbar: tqdm = None, use_wandb: bool = False
+):
+    """
+    Log to pbar, file and W&B
+    """
+    msg = [f"{k}: {v:.4f}" for k, v in log_dict.items() if isinstance(v, float)]
+    msg = [label, f"Step: {step}"] + msg
+    msg = " | ".join(msg)
+
+    logging.info(msg)
+
+    if pbar:
+        pbar.set_description(msg)
+
+    if use_wandb:
+        wandb.log(log_dict, step=step)
 
 
 @catch_error_decorator
@@ -126,40 +146,25 @@ def main(cfg: DictConfig):
         if (i + 1) % cfg.train.log_steps == 0:
             pred, test_loss, test_PSNR = eval_epoch(model, grid, img, **eval_kwargs)
 
-            # pbar update
-            msg = [
-                f"Step: {i + 1}",
-                f"loss: {test_loss:.4f}",
-                f"PSNR: {test_PSNR:.3f}",
-            ]
-
-            if mask:
-                msg += [f"Mask Prune Rate {mask.prune_rate:.5f}"]
-
-            msg = " | ".join(msg)
-            pbar.set_description(msg)
-            logging.info(msg)
-
-            # W&B logs
-            if cfg.wandb.use:
-                _log_dict = {
-                    "loss": test_loss,
-                    "PSNR": test_PSNR,
-                    "image": [
-                        wandb.Image(
-                            pred.permute(2, 0, 1).detach(),
-                            caption=cfg.img.name,
-                        )
-                    ],
-                }
-                if mask:
-                    _log_dict.update(
-                        {
-                            "prune_rate": mask.prune_rate,
-                            "density": mask.stats.total_density,
-                        }
+            log_dict = {
+                "loss": test_loss,
+                "PSNR": test_PSNR,
+                "image": [
+                    wandb.Image(
+                        pred.permute(2, 0, 1).detach(),
+                        caption=cfg.img.name,
                     )
-                wandb.log(_log_dict, step=i + 1)
+                ],
+            }
+            if mask:
+                log_dict.update(
+                    {"Prune Rate": mask.prune_rate, "Density": mask.stats.total_density}
+                )
+
+            # Pbar and file logging
+            file_and_wandb_logger(
+                "Train", i + 1, log_dict, pbar, use_wandb=cfg.wandb.use
+            )
 
     if cfg.quant:
         # Model
@@ -180,20 +185,19 @@ def main(cfg: DictConfig):
                 train_epoch(quantized_model, optim, grid, img, **train_kwargs)
 
                 # Evaluate
-                if (i + 1) % 50 == 0:
+                if (i + 1) % cfg.quant.log_steps == 0:
                     pred, compress_loss, compress_PSNR = eval_epoch(
                         quantized_model, grid, img, **eval_kwargs
                     )
 
-                    # pbar update
-                    msg = [
-                        f"Compress step: {i + 1}",
-                        f"Test loss: {compress_loss:.4f}",
-                        f"Test PSNR: {compress_PSNR:.3f}",
-                    ]
-                    msg = " | ".join(msg)
-                    pbar.set_description(msg)
-                    logging.info(msg)
+                    # Pbar and file logging
+                    log_dict = {
+                        "loss": compress_loss,
+                        "PSNR": compress_PSNR,
+                    }
+
+                    # Pbar and file logging
+                    file_and_wandb_logger("Quant", i + 1, log_dict, pbar)
 
         # Evaluate final model
         quantized_model = q.convert()
@@ -201,28 +205,31 @@ def main(cfg: DictConfig):
             quantized_model, grid, img, **eval_kwargs
         )
 
-        # W&B logs
-        if cfg.wandb.use:
-            _log_dict = {
-                "compress_loss": compress_loss,
-                "compress_PSNR": compress_PSNR,
-                "compress_image": [
-                    wandb.Image(
-                        pred.permute(2, 0, 1).detach(),
-                        caption=cfg.img.name,
-                    )
-                ],
-            }
-            wandb.log(_log_dict)
+        log_dict = {"Quant loss": compress_loss, "Quant PSNR": compress_PSNR}
 
-        # pbar update
+        # Pbar and file logging
         msg = [
-            f"Eval Compress Step: {cfg.train.num_steps}",
-            f"loss: {test_loss:.4f}",
-            f"PSNR: {test_PSNR:.3f}",
+            f"Post Quant",
+            f"Train step: {cfg.train.num_steps}",
+            f"Quant step: {cfg.quant.num_steps}",
         ]
+        msg += [f"{k}:{v:.4f}" for k, v in log_dict.items()]
         msg = " | ".join(msg)
         logging.info(msg)
+
+        # W&B logs
+        if cfg.wandb.use:
+            log_dict.update(
+                {
+                    "Quant image": [
+                        wandb.Image(
+                            pred.permute(2, 0, 1).detach(),
+                            caption=cfg.img.name,
+                        )
+                    ],
+                }
+            )
+            wandb.log(log_dict, step=cfg.train.num_steps)
 
     # Save weights
     if cfg.train.save_weights:
@@ -234,13 +241,18 @@ def main(cfg: DictConfig):
         if cfg.quant:
             quantized_model = quantized_model.half()
 
-        if cfg.entropy_coding:
-            compressed_bytes = entropy_coding.compress_state_dict(
-                quantized_model, "model_quantized", **cfg.entropy_coding
-            )
-            msg = f"Compressed bytes {compressed_bytes}"
-            print(msg)
-            logging.info(msg)
+            if cfg.entropy_coding:
+                compressed_bytes = entropy_coding.compress_state_dict(
+                    quantized_model, "model_quantized", **cfg.entropy_coding
+                )
+                msg = f"Compressed bytes {compressed_bytes}"
+                print(msg)
+                logging.info(msg)
+
+                if cfg.wandb.use:
+                    wandb.log(
+                        {"Compressed Bytes": compressed_bytes}, step=cfg.train.num_steps
+                    )
 
     # Close wandb context
     if cfg.wandb.use:
