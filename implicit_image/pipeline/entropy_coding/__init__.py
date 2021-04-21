@@ -6,7 +6,6 @@ from typing import Dict, Union
 import numpy as np
 import torch
 import zstandard
-from scipy.sparse import csc_matrix
 from torch import nn
 
 from implicit_image.pipeline.entropy_coding import utils as encoding_utils
@@ -95,41 +94,17 @@ def compress_state_dict(
             order = 0
             for name, tensor in state_dict.items():
                 array = tensor.numpy()
-                # Convert to CSC only if
-                # sparsity crosses 60%
-                if encoding_utils.sparsity(array) > 0.6:
-                    sparse_array = csc_matrix(array, dtype=array.dtype)
 
-                    dtype = np.uint8
-                    if array.shape[1] > 256:
-                        dtype = np.uint16
-                    sparse_array.indices = sparse_array.indices.astype(dtype)
-                    sparse_array.indptr = sparse_array.indptr.astype(np.uint16)
+                compressor.write(array)
+                info_dict = {
+                    "shape": array.shape,
+                    "dtype": str(array.dtype),
+                    "name": name,
+                }
+                meta_data[order] = info_dict
 
-                    for attribute in ["data", "indices", "indptr"]:
-                        sparse_rep = getattr(sparse_array, attribute)
-                        compressor.write(sparse_rep)
-
-                        info_dict = {
-                            "shape": sparse_rep.shape,
-                            "dtype": str(sparse_rep.dtype),
-                            "name": f"{name}_{attribute}",
-                        }
-                        meta_data[order] = info_dict
-
-                        # Increment order
-                        order += 1
-                else:
-                    compressor.write(array)
-                    info_dict = {
-                        "shape": array.shape,
-                        "dtype": str(array.dtype),
-                        "name": name,
-                    }
-                    meta_data[order] = info_dict
-
-                    # Increment order
-                    order += 1
+                # Increment order
+                order += 1
 
             # Flush compressor, get bytes written
             compressed_bytes = compressor.flush()
@@ -181,45 +156,12 @@ def decompress_state_dict(dir_name: Union[str, Path], stream_name: str, **kwargs
                 array.resize(*array_shape)
 
                 # Add to state_dict
-                state_dict[name] = array
+                state_dict[name] = torch.from_numpy(array.copy()).float()
 
                 # Update offset
                 offset += array_size * np.dtype(dtype).itemsize
 
-    tensor_state_dict = {}
-    # Convert csc matrices
-    for name in state_dict.keys():
-        if not (
-            ("centroids" in name)
-            or ("_data" in name)
-            or ("_indices" in name)
-            or ("_indptr" in name)
-        ):
-            tensor_state_dict[name] = torch.from_numpy(state_dict[name]).float()
-        elif "data" in name:
-            root_name = name.replace("_data", "")
-
-            data = state_dict[f"{root_name}_data"]
-            if not np.issubdtype(data.dtype, np.floating):
-                data = data.astype(np.int32)
-            else:
-                data = data.astype(np.float32)
-
-            indices = state_dict[f"{root_name}_indices"].astype(np.int32)
-            indptr = state_dict[f"{root_name}_indptr"].astype(np.int32)
-
-            weight = csc_matrix((data, indices, indptr), dtype=data.dtype).todense()
-
-            # Convert centroid, labels
-            if "labeled_weight" in root_name:
-                centroid_name = root_name.replace("labeled_weight", "centroids")
-                weight = state_dict[centroid_name][weight]
-
-            tensor_state_dict[
-                root_name.replace("labeled_weight", "weight")
-            ] = torch.from_numpy(weight).float()
-
-    return tensor_state_dict
+    return state_dict
 
 
 def test_compress_decompress():
@@ -230,7 +172,7 @@ def test_compress_decompress():
     from implicit_image.utils.train_helper import train_epoch
     from implicit_image.pipeline.quant.kmeans import KmeansQuant
 
-    model = Siren()
+    model = Siren(hidden_size=128)
     optim = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     img = torch.rand(1, 1, 3)
