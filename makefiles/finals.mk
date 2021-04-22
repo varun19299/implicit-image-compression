@@ -7,5 +7,5 @@ finals.compress.%:
 	entropy_coding=zstd \
 	train.multiplier=5 \
 	exp_name='density_$${masking.density}' \
-	wandb.name='$${img.name}_$${exp_name}' wandb.project=finals \
+	wandb.name='$${img.name}_$${exp_name}' wandb.project=finals_simple \
 	$(KWARGS) $(HYDRA_FLAGS)

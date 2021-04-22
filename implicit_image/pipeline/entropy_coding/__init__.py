@@ -86,10 +86,10 @@ def compress_state_dict(
         dir_name = Path(dir_name)
         dir_name.mkdir(exist_ok=True, parents=True)
 
-    binary_file_name = dir_name / f"compressed_weights.data"
+    binary_file = dir_name / f"compressed_weights.data"
     meta_data_file = dir_name / "meta_data.json"
 
-    with open(binary_file_name, "wb") as opened_handler:
+    with open(binary_file, "wb") as opened_handler:
         with stream_writer(opened_handler) as compressor:
             order = 0
             for name, tensor in state_dict.items():
@@ -106,13 +106,13 @@ def compress_state_dict(
                 # Increment order
                 order += 1
 
-            # Flush compressor, get bytes written
-            compressed_bytes = compressor.flush()
+            # Flush compressor
+            compressor.flush()
 
     with open(meta_data_file, "w") as f:
         f.write(json.dumps(meta_data, indent=2, sort_keys=True))
 
-    return compressed_bytes
+    return binary_file.stat().st_size
 
 
 def decompress_state_dict(dir_name: Union[str, Path], stream_name: str, **kwargs):
@@ -156,12 +156,28 @@ def decompress_state_dict(dir_name: Union[str, Path], stream_name: str, **kwargs
                 array.resize(*array_shape)
 
                 # Add to state_dict
-                state_dict[name] = torch.from_numpy(array.copy()).float()
+                state_dict[name] = array
 
                 # Update offset
                 offset += array_size * np.dtype(dtype).itemsize
 
-    return state_dict
+    tensor_state_dict = {}
+    # Convert csc matrices
+    for name in state_dict.keys():
+        if not (("centroids" in name) or ("labeled_weight" in name)):
+            tensor_state_dict[name] = torch.from_numpy(state_dict[name].copy()).float()
+        elif "labeled_weight" in name:
+            labeled_weight = state_dict[name]
+            centroids_name = name.replace("labeled_weight", "centroids")
+            centroids = state_dict[centroids_name]
+
+            weight = centroids[labeled_weight]
+
+            tensor_state_dict[
+                name.replace("labeled_weight", "weight")
+            ] = torch.from_numpy(weight.copy()).float()
+
+    return tensor_state_dict
 
 
 def test_compress_decompress():
