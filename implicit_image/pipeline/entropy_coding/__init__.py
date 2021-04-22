@@ -120,6 +120,7 @@ def decompress_state_dict(dir_name: Union[str, Path], stream_name: str, **kwargs
 
     if isinstance(dir_name, str):
         dir_name = Path(dir_name)
+    dir_name.mkdir(exist_ok=True, parents=True)
 
     binary_file_name = dir_name / f"compressed_weights.data"
     meta_data_file = dir_name / "meta_data.json"
