@@ -6,7 +6,7 @@ dense_gradients: True
 
 growth_mode: absolute-gradient  # Growth mode. Choose from: momentum, random, and momentum_neuron.
 prune_mode: magnitude  # Prune mode / pruning mode. Choose from: magnitude, SET.
-redistribution_mode: momentum  # Redistribution mode. Choose from: momentum, magnitude, nonzeros, or none.
+redistribution_mode: none  # Redistribution mode. Choose from: momentum, magnitude, nonzeros, or none.
 dense: False  # Enable dense mode. Default: False.
 
 prune_rate: 0.1  # The pruning rate / prune rate.

@@ -47,30 +47,30 @@ fi
 # bridge
 
 density_ll=(
-#    0.01
-#    0.02
-#    0.05
-#    0.10
+    0.01
+    0.02
+    0.05
+    0.10
     0.20
     0.25
-#    0.30
+    0.30
     0.35
     0.40
     0.45
-#    0.50
+    0.50
     0.55
-#    0.60
+    0.60
     0.65
-#    0.70
+    0.70
     0.75
-#    0.80
+    0.80
     0.85
     0.90
 )
 
 for i in "${density_ll[@]}"; do
     if [ ${1} == "building" ] ||  [ ${1} == "bridge" ]; then
-       make finals.compress.${1} DENSITY=$i KWARGS="mlp.hidden_size=256"
+       make finals.compress.${1} DENSITY=$i KWARGS="mlp.hidden_size=182 quant.bits=9"
     else
        make finals.compress.${1} DENSITY=$i
     fi
