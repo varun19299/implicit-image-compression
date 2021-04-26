@@ -2,7 +2,7 @@
 name: SNFS
 
 density: 0.05  # The density of the overall sparse network.
-sparse_init: random
+sparse_init: erdos-renyi-kernel
 dense_gradients: True
 
 growth_mode: momentum  # Growth mode. Choose from: momentum, random, and momentum_neuron.
@@ -13,6 +13,6 @@ dense: False  # Enable dense mode. Default: False.
 prune_rate: 0.1  # The pruning rate / prune rate.
 decay_schedule: cosine  # The decay schedule for the pruning rate. Default: cosine. Choose from: cosine, linear
 end_when: 1500 # Epochs / Training Step till which mask updates are applied (set to 75% total steps)
-interval: 10 # Which epochs or steps to apply at
+interval: 20 # Which epochs or steps to apply at
 
 print_FLOPs: True

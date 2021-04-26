@@ -120,23 +120,13 @@ class KmeansQuant:
         weight_nonzero = weight[weight != 0].reshape(-1, 1)
 
         # Linear guess
-        # if not hasattr(module, "centroids"):
-        if True:
-            # Linear guess
-            guess = torch.linspace(
-                weight_nonzero.min(),
-                weight_nonzero.max(),
-                self.n_clusters - 1,
-                device=device,
-                dtype=dtype,
-            ).reshape(-1, 1)
-
-            # # Append 0.0 as a centroid
-            # prepend = torch.zeros_like(guess)[:1]
-            # guess = torch.cat((prepend, guess))
-        else:
-            # guess = rearrange(module.centroids, "n -> n 1")
-            guess = rearrange(module.centroids[1:], "n -> n 1")
+        guess = torch.linspace(
+            weight_nonzero.min(),
+            weight_nonzero.max(),
+            self.n_clusters - 1,
+            device=device,
+            dtype=dtype,
+        ).reshape(-1, 1)
 
         labels, centroids = kmeans_fit(
             weight_nonzero, num_clusters=self.n_clusters - 1, cluster_centers=guess
@@ -145,16 +135,13 @@ class KmeansQuant:
         # Append 0.0 as a centroid
         prepend = torch.zeros_like(centroids)[:1]
         centroids = torch.cat((prepend, centroids))
+
         # Keep only unique centroids
         centroids = torch.unique(centroids)
         _, indices = torch.sort(centroids.abs())
         centroids = rearrange(centroids[indices], "n -> n 1")
 
         labels = kmeans_predict(weight, centroids).reshape(*shape)
-
-        # kmeans = KMeans_torch(n_clusters=self.n_clusters, init=guess)
-        # labels = kmeans.fit_predict(weight).reshape(*shape)
-        # centroids = kmeans.cluster_centers_
 
         # Drop centroids into labels
         centroids = rearrange(centroids, "n 1-> n")

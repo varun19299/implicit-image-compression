@@ -1,0 +1,9 @@
+# @package img
+name: text_3
+bits: 8
+path: ${hydra:runtime.cwd}/img/text_tancik/${img.name}.png
+height: 512
+width: 512
+plot: False
+crop_mode: "resize-crop"
+save_gt: False

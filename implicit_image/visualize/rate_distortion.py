@@ -6,23 +6,21 @@ python visualize/weight_removal.py wandb.project=masking
 import itertools
 import logging
 import os
-from typing import List
+import sys
 from pathlib import Path
+from typing import List
+
+import cv2
 import hydra
+import numpy as np
 import pandas as pd
 import wandb
-from omegaconf import DictConfig
 from matplotlib import pyplot as plt
+from omegaconf import DictConfig
 
-COLORS = {
-    "Small_Dense": "green",
-    "Feathermap": "blue",
-    "RigL": "purple",
-    "Pruning": "brown",
-    "siren": "black",
-}
-linewidth = 3
-alpha = 0.8
+from implicit_image.data import load_img
+
+from collections import namedtuple
 
 # Matplotlib font sizes
 TINY_SIZE = 8
@@ -39,12 +37,11 @@ plt.rc("legend", fontsize=MEDIUM_SIZE)  # legend fontsize
 plt.rc("figure", titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
-def get_stats_table(
+def ours_rate_distortion(
     runs,
-    image_ll: List[str] = ["flower_foveon"],
-    masking_ll: List[str] = ["RigL"],
+    image: str,
     density_ll: List[float] = [0.1],
-    suffix_ll: List[str] = ["train_5x"],
+    suffix_ll: List[str] = [""],
     reorder: bool = True,
 ) -> pd.DataFrame:
     """
@@ -56,16 +53,15 @@ def get_stats_table(
     (masking_ll x init_ll x suffix_ll x density_ll etc).
 
     :param runs: Experiment run
-    :param masking_ll: List of sparse training techniques
+    :param image: name
     :param density_ll: List of density values (1 - sparsity)
-    :param image_ll: List of images
     :param suffix_ll: List of suffixes
     :param reorder: sort methods alphabetically
 
     :return: Dataframe containing test accuracies of methods
     :rtype: pd.DataFrame
     """
-    columns = ["Image", "Method", "Density", "PSNR"]
+    columns = ["Density", "Bytes", "PSNR"]
     df = pd.DataFrame(columns=columns)
 
     # Pre-process
@@ -74,11 +70,8 @@ def get_stats_table(
     for run in runs:
         run_dict[run.name] = run
 
-    for e, (image, masking, density, suffix) in enumerate(
-        itertools.product(image_ll, masking_ll, density_ll, suffix_ll)
-    ):
-
-        tags = [image, masking, density, suffix]
+    for e, (density, suffix) in enumerate(itertools.product(density_ll, suffix_ll)):
+        tags = [image, suffix, f"density_{round(density,2)}"]
 
         # Remove tags that are None
         name = "_".join([str(tag) for tag in tags if tag])
@@ -89,11 +82,13 @@ def get_stats_table(
             logging.debug(f"Run {name} not present")
             continue
 
-        psnr = run.summary.get("test_PSNR")
+        compressed_psnr = run.summary.get("Quant PSNR")
+        compressed_bytes = run.summary.get("Compressed Bytes")
+        df.loc[e] = [density, compressed_bytes, compressed_psnr]
 
-        df.loc[e] = [image, masking, density, psnr]
-
-    df = df.sort_values(by=["Image", "Method", "Density"])
+    df = df.dropna()
+    df["Bytes"] = df["Bytes"].astype(int)
+    df = df.sort_values(by=["Density", "Bytes"])
 
     if reorder:
         df = df.reset_index(drop=True)
@@ -101,52 +96,44 @@ def get_stats_table(
     return df
 
 
-def sparsity_plot(
-    df: pd.DataFrame,
-    image_ll: List[str] = ["flower_foveon"],
-    masking_ll: List[str] = ["RigL"],
-):
-    for image in image_ll:
-        for masking in masking_ll:
-            sub_df = df.loc[(df["Method"] == masking) & (df["Image"] == image)]
-            color = COLORS[masking]
+def traditional_rate_distortion(img, extension="jpg"):
+    # Initialize directories
+    dump_path = Path("/tmp/traditional")
+    dump_path.mkdir(exist_ok=True, parents=True)
 
-            if masking == "siren":
-                label = "Baseline"
-                plt.axhline(
-                    y=sub_df["PSNR"].item(),
-                    color=color,
-                    label=label,
-                    linewidth=linewidth,
-                    alpha=alpha,
-                )
-            else:
-                label = masking.replace("_", "-").replace("siren", "Baseline")
-                plt.plot(
-                    1 - sub_df["Density"],
-                    sub_df["PSNR"],
-                    color=color,
-                    label=label,
-                    marker="o",
-                    linewidth=linewidth,
-                    alpha=alpha,
-                )
+    # specifies the sizes the jpg2000 will compress to
+    quality_ll = np.linspace(0, 100, 20).astype(int).tolist()
 
-        xticks = [0.25, 0.5, 0.8, 0.9, 0.95]
-        plt.xticks(xticks, [f"{(1 - xtick) * 100:.0f}" for xtick in xticks])
-        plt.xlabel("% of Original Weights")
-        plt.ylabel("PSNR (in dB)")
-        plt.ylim(13, 45)
-        plt.legend(loc="lower left")
-        plt.grid()
-        plt.tight_layout()
+    psnr_ll = []
+    size_ll = []
 
-        # Save plot
-        path = Path(f"{hydra.utils.get_original_cwd()}/outputs/plots/")
-        path.mkdir(exist_ok=True, parents=True)
+    extension_flags = {
+        "jpg": cv2.IMWRITE_JPEG_QUALITY,
+        "webp": cv2.IMWRITE_WEBP_QUALITY,
+        "jp2": cv2.IMWRITE_JPEG2000_COMPRESSION_X1000,
+    }
 
-        plt.savefig(path / f"weight_removal_{image}.pdf", dpi=150)
-        plt.show()
+    img = (img * 255)[:, :, ::-1]
+
+    for quality in quality_ll:
+        encode_param = [int(extension_flags[extension]), quality]
+        result, encimg = cv2.imencode(f".{extension}", img, encode_param)
+        assert result, f"Could not encode image at quality {quality}"
+
+        # decode
+        decimg = cv2.imdecode(encimg, 1)
+
+        psnr = 10 * np.log10(255 ** 2 / ((decimg - img) ** 2).mean())
+        psnr_ll.append(psnr)
+
+        size = sys.getsizeof(encimg)
+        size_ll.append(size)
+
+    df = pd.DataFrame({"PSNR": psnr_ll, "Bytes": size_ll})
+    df = df.sort_values(by=["Bytes"])
+    df = df.reset_index(drop=True)
+
+    return df
 
 
 @hydra.main(config_name="config", config_path="../../conf")
@@ -159,31 +146,60 @@ def main(cfg: DictConfig):
     api = wandb.Api()
     runs = api.runs(f"{cfg.wandb.entity}/{cfg.wandb.project}")
 
-    image_ll = ["flower_foveon", "bridge", "big_building"]
-    masking_ll = ["RigL", "Small_Dense", "Pruning", "Feathermap", "siren"]
-    suffix_ll = ["train_5x"]
-    density_ll = [0.05, 0.1, 0.2, 0.5, 0.75, None]
-
-    df = get_stats_table(
-        runs,
-        image_ll=image_ll,
-        masking_ll=masking_ll,
-        density_ll=density_ll,
-        suffix_ll=suffix_ll,
-    )
+    density_ll = [0.01, 0.02] + np.arange(0.05, 0.95, step=0.05).tolist()
+    ours_df = ours_rate_distortion(runs, cfg.img.name, density_ll=density_ll)
 
     # Set longer length
     pd.options.display.max_rows = 150
-
     with pd.option_context("display.float_format", "{:.3f}".format):
-        print(df)
+        print("Ours\n")
+        print(ours_df)
+
+    # Open image
+    # H x W x 3
+    # RGB between 0...255
+    img = load_img(**cfg.img).numpy()
+
+    PlotProperty = namedtuple("PlotProperty", ["name", "color", "linewidth", "alpha"])
+
+    linewidth = 2
+    alpha = 0.8
+    plot_dict = {
+        "jpg": PlotProperty("JPEG", "orange", linewidth, alpha),
+        "webp": PlotProperty("WebP", "blue", linewidth, alpha),
+        "jp2": PlotProperty("JPEG2000", "limegreen", linewidth, alpha),
+        "ours": PlotProperty("Ours", "purple", linewidth, alpha),
+    }
+
+    for method in plot_dict:
+        df = (
+            traditional_rate_distortion(img, extension=method)
+            if method != "ours"
+            else ours_df
+        )
+
+        plt.plot(
+            df["Bytes"] / 1024,
+            df["PSNR"],
+            color=plot_dict[method].color,
+            label=plot_dict[method].name,
+            marker="o",
+            linewidth=plot_dict[method].linewidth,
+            alpha=plot_dict[method].alpha,
+        )
+
+    plt.legend(loc="lower right")
+    plt.xlabel("Size (KB)")
+    plt.ylabel("PSNR (dB)")
+    # plt.title("Rate Distortion Curve")
+    plt.grid()
 
     # Save to CSV
-    path = Path(f"{hydra.utils.get_original_cwd()}/outputs/csv/")
+    path = Path(f"{hydra.utils.get_original_cwd()}/outputs/plots/")
     path.mkdir(exist_ok=True, parents=True)
-    df.to_csv(path / f"sparsify_results.csv")
-
-    sparsity_plot(df, image_ll, masking_ll)
+    plt.tight_layout()
+    plt.savefig(path / f"{cfg.img.name}_rate_distortion.pdf", dpi=150)
+    plt.show()
 
 
 if __name__ == "__main__":

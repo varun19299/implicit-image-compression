@@ -144,11 +144,14 @@ def main(cfg: DictConfig):
 
         # Evaluate
         if (i + 1) % cfg.train.log_steps == 0:
-            pred, test_loss, test_PSNR = eval_epoch(model, grid, img, **eval_kwargs)
+            pred, test_loss, test_PSNR, test_PSNR_8bit = eval_epoch(
+                model, grid, img, **eval_kwargs
+            )
 
             log_dict = {
                 "loss": test_loss,
                 "PSNR": test_PSNR,
+                "PSNR_8bit": test_PSNR_8bit,
                 "image": [
                     wandb.Image(
                         pred.permute(2, 0, 1).detach(),
@@ -186,7 +189,7 @@ def main(cfg: DictConfig):
 
                 # Evaluate
                 if (i + 1) % cfg.quant.log_steps == 0:
-                    pred, compress_loss, compress_PSNR = eval_epoch(
+                    pred, compress_loss, compress_PSNR, compress_PSNR_8bit = eval_epoch(
                         quantized_model, grid, img, **eval_kwargs
                     )
 
@@ -194,6 +197,7 @@ def main(cfg: DictConfig):
                     log_dict = {
                         "loss": compress_loss,
                         "PSNR": compress_PSNR,
+                        "PSNR_8bit": compress_PSNR_8bit,
                     }
 
                     # Pbar and file logging
@@ -201,11 +205,15 @@ def main(cfg: DictConfig):
 
         # Evaluate final model
         quantized_model = q.convert()
-        pred, compress_loss, compress_PSNR = eval_epoch(
+        pred, compress_loss, compress_PSNR, compress_PSNR_8bit = eval_epoch(
             quantized_model, grid, img, **eval_kwargs
         )
 
-        log_dict = {"Quant loss": compress_loss, "Quant PSNR": compress_PSNR}
+        log_dict = {
+            "Quant loss": compress_loss,
+            "Quant PSNR": compress_PSNR,
+            "Quant PSNR 8bit": compress_PSNR_8bit,
+        }
 
         # Pbar and file logging
         msg = [

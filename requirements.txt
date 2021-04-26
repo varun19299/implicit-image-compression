@@ -17,6 +17,7 @@ git+https://github.com/fbcotter/pytorch_wavelets
 matplotlib
 numpy
 opencv-python
+Pillow
 pyyaml>=5.4
 
 torch==1.7

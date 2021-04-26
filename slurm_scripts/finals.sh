@@ -66,11 +66,14 @@ density_ll=(
     0.80
     0.85
     0.90
+    0.95
 )
 
 for i in "${density_ll[@]}"; do
     if [ ${1} == "building" ] ||  [ ${1} == "bridge" ]; then
        make finals.compress.${1} DENSITY=$i KWARGS="mlp.hidden_size=182 quant.bits=9"
+#    elif [ ${1} == "text_3" ]; then
+#       make finals.compress.${1} DENSITY=$i KWARGS="mlp.hidden_size=64"
     else
        make finals.compress.${1} DENSITY=$i
     fi

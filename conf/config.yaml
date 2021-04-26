@@ -16,7 +16,7 @@ device: cuda # cpu or cuda
 
 train:
   num_steps: 2000
-  log_steps: 400
+  log_steps: 1000
   batch_height: ${img.height}
   batch_width: ${img.width}
   save_weights: True

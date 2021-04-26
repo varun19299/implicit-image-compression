@@ -48,10 +48,15 @@ def eval_epoch(model: Module, grid, img, **kwargs) -> Tuple[torch.Tensor, float,
     with context():
         pred = model(grid)
 
+    img_8bit = (img * 255).int()
+    pred_8bit = (pred * 255).int()
+
     test_loss = F.mse_loss(pred, img)
     test_PSNR = 10 * torch.log10(1 / test_loss)
+    mse_8bit = ((img_8bit - pred_8bit) ** 2).float().mean()
+    test_PSNR_8bit = 10 * torch.log10(255 ** 2 / mse_8bit)
 
-    return pred, test_loss.item(), test_PSNR.item()
+    return pred, test_loss.item(), test_PSNR.item(), test_PSNR_8bit.item()
 
 
 def get_device(device_str: str) -> torch.device:
@@ -75,7 +80,7 @@ def get_optimizer_lr_scheduler(
     if quantize_mode:
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 1000, gamma=0.5)
     else:
-        # empirically, step lr (cut by 5 after 1k steps) should be better
+        # empirically, step lr (cut by half after 1k steps) should be better
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optim, 2000, gamma=0.5)
 
     return optim, lr_scheduler

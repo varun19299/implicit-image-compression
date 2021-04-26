@@ -29,9 +29,14 @@ def linear_state_dict(model: nn.Module) -> Dict[str, torch.Tensor]:
 
                 if f"{name}.labeled_weight" not in state_dict:
                     raise KeyError("Please run .update() before compressing weights")
+
+                labeled_weight = state_dict[f"{name}.labeled_weight"]
+                dtype = torch.uint8
+                if labeled_weight.max() > 2 ** 8:
+                    dtype = torch.uint16
                 state_dict[f"{name}.labeled_weight"] = state_dict[
                     f"{name}.labeled_weight"
-                ].to(torch.uint8)
+                ].to(dtype)
 
     return state_dict
 
