@@ -5,6 +5,7 @@ wandb_api.key
 
 # DIV2K images are too big
 img/rgb*/*
+img/text_tancik
 
 __pycache__*
 Icon*
