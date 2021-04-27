@@ -1,17 +1,16 @@
 """
 Plot PSNR, Storage as a function of JPEG quality
 """
-import cv2
-import hydra
-from matplotlib import pyplot as plt
-import numpy as np
-from omegaconf import DictConfig, OmegaConf
+import json
 from pathlib import Path
 
-import time
+import cv2
+import hydra
+import numpy as np
+from matplotlib import pyplot as plt
+from omegaconf import DictConfig, OmegaConf
+
 from implicit_image.data import load_img
-import json
-import sys
 
 # Matplotlib font sizes
 TINY_SIZE = 8
@@ -28,7 +27,7 @@ plt.rc("legend", fontsize=MEDIUM_SIZE)  # legend fontsize
 plt.rc("figure", titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
-def _plot_image_dict(img_dict, x_key: str, y_key: str, path: Path, extension: str):
+def _plot_image_dict(img_dict, x_key: str, y_key: str, path: Path):
     _label_dict = {"psnr": "PSNR (in dB)", "quality": "Quality", "size": "Size (in KB)"}
     for img_name in img_dict:
         plt.plot(
@@ -63,13 +62,6 @@ def main(cfg: DictConfig):
     path = Path(f"{hydra.utils.get_original_cwd()}/outputs/plots/")
     path.mkdir(exist_ok=True, parents=True)
 
-    extension = "jpg"
-    extension_flags = {
-        "jpg": cv2.IMWRITE_JPEG_QUALITY,
-        "webp": cv2.IMWRITE_WEBP_QUALITY,
-        "jp2": cv2.IMWRITE_JPEG2000_COMPRESSION_X1000,
-    }
-
     for img_name in img_names:
         single_cfg = cfg.copy()
         single_cfg.img.path = str(Path(single_cfg.img.path).parent / img_name)
@@ -87,25 +79,27 @@ def main(cfg: DictConfig):
         size_ll = []
 
         for quality in quality_ll:
-            encode_param = [int(extension_flags[extension]), quality]
-            result, encimg = cv2.imencode(f".{extension}", img, encode_param)
+            encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
+            result, encimg = cv2.imencode(".jpg", img, encode_param)
             assert result, f"Could not encode image at quality {quality}"
 
             # decode from jpeg format
+            dump_file = dump_path / f"{img_name}_{quality}.jpg"
             decimg = cv2.imdecode(encimg, 1)
+            cv2.imwrite(str(dump_file), decimg)
 
             psnr = 10 * np.log10(255 ** 2 / ((decimg - img) ** 2).mean())
             psnr_ll.append(psnr)
 
-            size = sys.getsizeof(encimg)
+            size = dump_file.stat().st_size
             size_ll.append(size // 1024)
 
         img_dict[img_name] = {"psnr": psnr_ll, "size": size_ll, "quality": quality_ll}
 
     # breakpoint()
-    _plot_image_dict(img_dict, "quality", "psnr", path, extension)
-    _plot_image_dict(img_dict, "quality", "size", path, extension)
-    _plot_image_dict(img_dict, "size", "psnr", path, extension)
+    _plot_image_dict(img_dict, "quality", "psnr", path)
+    _plot_image_dict(img_dict, "quality", "size", path)
+    _plot_image_dict(img_dict, "size", "psnr", path)
 
     # Convert to list
     for name in img_dict:
@@ -113,7 +107,7 @@ def main(cfg: DictConfig):
             if isinstance(metric_ll, np.ndarray):
                 img_dict[name][metric] = metric_ll.tolist()
 
-    with open(path.parent / "csv" / f"{extension}_dump.json", "w") as f:
+    with open(path.parent / "csv" / f"jpg_dump.json", "w") as f:
         json.dump(img_dict, f, indent=4, sort_keys=True)
 
 

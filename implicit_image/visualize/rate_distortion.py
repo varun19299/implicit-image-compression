@@ -1,12 +1,18 @@
 """
 Run as:
 
-python visualize/weight_removal.py wandb.project=masking
+ python implicit_image/visualize/rate_distortion.py wandb.project=finals_simple img=flower
+
+or:
+
+ make vis.rate_distortion.flower etc.
+
+See conf/img for names of img YAML files.
 """
 import itertools
 import logging
 import os
-import sys
+from collections import namedtuple
 from pathlib import Path
 from typing import List
 
@@ -15,12 +21,11 @@ import hydra
 import numpy as np
 import pandas as pd
 import wandb
+from PIL import Image
 from matplotlib import pyplot as plt
 from omegaconf import DictConfig
 
 from implicit_image.data import load_img
-
-from collections import namedtuple
 
 # Matplotlib font sizes
 TINY_SIZE = 8
@@ -96,7 +101,7 @@ def ours_rate_distortion(
     return df
 
 
-def traditional_rate_distortion(img, extension="jpg"):
+def traditional_rate_distortion(img, img_name: str, extension="jpg"):
     # Initialize directories
     dump_path = Path("/tmp/traditional")
     dump_path.mkdir(exist_ok=True, parents=True)
@@ -113,20 +118,28 @@ def traditional_rate_distortion(img, extension="jpg"):
         "jp2": cv2.IMWRITE_JPEG2000_COMPRESSION_X1000,
     }
 
-    img = (img * 255)[:, :, ::-1]
+    img = (img * 255)[:, :, ::-1].astype(int)
 
     for quality in quality_ll:
-        encode_param = [int(extension_flags[extension]), quality]
-        result, encimg = cv2.imencode(f".{extension}", img, encode_param)
-        assert result, f"Could not encode image at quality {quality}"
+        dump_file = dump_path / f"{img_name}_{quality}.{extension}"
 
-        # decode
-        decimg = cv2.imdecode(encimg, 1)
+        if extension == "webp":
+            img_pil = Image.fromarray(img[:, :, ::-1].astype(np.uint8))
+            img_pil.save(dump_file, quality=quality)
+            decimg = np.asarray(Image.open(dump_file))[:, :, ::-1]
+        else:
+            encode_param = [int(extension_flags[extension]), quality]
+            result, encimg = cv2.imencode(f".{extension}", img, encode_param)
+            assert result, f"Could not encode image at quality {quality}"
 
-        psnr = 10 * np.log10(255 ** 2 / ((decimg - img) ** 2).mean())
+            # decode
+            decimg = cv2.imdecode(encimg, -1)
+            cv2.imwrite(str(dump_file), decimg)
+
+        psnr = 10 * np.log10(255 ** 2 / ((decimg.astype(int) - img) ** 2).mean())
         psnr_ll.append(psnr)
 
-        size = sys.getsizeof(encimg)
+        size = dump_file.stat().st_size
         size_ll.append(size)
 
     df = pd.DataFrame({"PSNR": psnr_ll, "Bytes": size_ll})
@@ -149,12 +162,6 @@ def main(cfg: DictConfig):
     density_ll = [0.01, 0.02] + np.arange(0.05, 0.95, step=0.05).tolist()
     ours_df = ours_rate_distortion(runs, cfg.img.name, density_ll=density_ll)
 
-    # Set longer length
-    pd.options.display.max_rows = 150
-    with pd.option_context("display.float_format", "{:.3f}".format):
-        print("Ours\n")
-        print(ours_df)
-
     # Open image
     # H x W x 3
     # RGB between 0...255
@@ -173,10 +180,11 @@ def main(cfg: DictConfig):
 
     for method in plot_dict:
         df = (
-            traditional_rate_distortion(img, extension=method)
+            traditional_rate_distortion(img, cfg.img.name, extension=method)
             if method != "ours"
             else ours_df
         )
+        print(method, df)
 
         plt.plot(
             df["Bytes"] / 1024,
