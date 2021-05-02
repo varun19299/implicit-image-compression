@@ -170,11 +170,11 @@ def main(cfg: DictConfig):
     PlotProperty = namedtuple("PlotProperty", ["name", "color", "linewidth", "alpha"])
 
     linewidth = 2
-    alpha = 0.8
+    alpha = 0.9
     plot_dict = {
         "jpg": PlotProperty("JPEG", "orange", linewidth, alpha),
-        "webp": PlotProperty("WebP", "blue", linewidth, alpha),
-        "jp2": PlotProperty("JPEG2000", "limegreen", linewidth, alpha),
+        "jp2": PlotProperty("JPEG2000", "lime", linewidth, alpha),
+        "webp": PlotProperty("WebP", "deepskyblue", linewidth, alpha),
         "ours": PlotProperty("Ours", "purple", linewidth, alpha),
     }
 
