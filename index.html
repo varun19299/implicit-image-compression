@@ -125,14 +125,15 @@
                     Abstract & Method
                 </h3>
                 Implicit Neural Networks, being a continuous mapping, can serve as a compelling choice for representing
-                a varietyof commonly encountered 2D and 3D signals.
-                In this project, we specifically consider the task of image compressionvia implicit networks.
-                Unfortunately, owing to the over-parameterized nature of deep networks, a naive approach mayrequire more
+                a variety of commonly encountered 2D and 3D signals.
+                In this project, we specifically consider the task of image compression via implicit networks.
+                Unfortunately, owing to the over-parameterized nature of deep networks, a naive approach may require
+                more
                 parameters than samples present in the original signal.
-                Furthermore, the capacity of such networks oftensaturates with increasing width or depth.
-                We explored two related directions: (a) efficiently increasing thecapacity of implicit MLPs to fit
+                Furthermore, the capacity of such networks often saturates with increasing width or depth.
+                We explored two related directions: (a) efficiently increasing the capacity of implicit MLPs to fit
                 natural images, and
-                (b) reducing the storage requirement of such networks through acombination of structured hashing,
+                (b) reducing the storage requirement of such networks through a combination of structured hashing,
                 quantization and entropy coding.
                 <br>
                 <figure>
@@ -188,25 +189,25 @@
                     Such MLPs replace traditional grid-based representations, and map low-dimensional coordinates to
                     output quantities such as pixel intensities or densities.
                     Their inherent continuous and differentiable nature makes these representations a compelling choice.
-                    Additionally, in theparticular case of 3D points, such networks are often much more compact than
+                    Additionally, in the particular case of 3D points, such networks are often much more compact than
                     grid-based representations. Following Tancik et al. (2020), we shall refer to such neural networks
                     as “coordinate MLPs”.
                 </p>
                 <p>
                     In this work, we examine if these benefits can be carried over to the simpler 2D case of images. We
                     consider applying coordinate MLPs for the task of lossy image compression by mapping 2D
-                    grid-locations(x,y)∈[0,1]2to RGB intensities.
+                    grid-locations(x,y)∈[0,1]<sup>2</sup> to RGB intensities.
                     By fitting a MLP, we transfer the task of compressing a grid of pixels to compressing the
                     corresponding network’s weights. The representation is no longer limited by the grid-resolution but
                     by the underlying network architecture.
                     This however can be challenging since deep networks often have more parameters than data points
-                    itself.However, a wide body of research addresses the efficient storage and inference of deep
+                    itself. However, a wide body of research addresses the efficient storage and inference of deep
                     networks,
-                    although generallytargeted towards high-dimensional mapping tasks such as image classification.
+                    although generally targeted towards high-dimensional mapping tasks such as image classification.
                 </p>
                 <p>
                     Another challenge associated with coordinate MLPs is their diminishing increase in capacity with
-                    growing layerwidth and depth. This makes representing signals which are densely sampled (large
+                    growing layer width and depth. This makes representing signals which are densely sampled (large
                     resolution) or with finer detail difficult.
                     Rebain et al. (2020) tackle this issue for the case of 3D points by decomposing the scene into soft
                     Voronoidiagrams and dedicating smaller networks for each part.
@@ -235,42 +236,31 @@
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-md-8 col-md-offset-2">
-                <h3>
-                    Approach
-                </h3>
-                <br>
-
-
-                </ul>
-            </div>
-        </div>
 
         <div class="row">
             <div class="col-md-8 col-md-offset-2">
                 <h3>
-                    Implementation
+                    Approach and Implementation
                 </h3>
                 <br>
                 <p>
                     As illustrated in Figure 1, our pipeline first fits a coordinate MLP to an image, either directly or
-                    indirectly via a synthesisequation.
+                    indirectly via a synthesis equation.
                     We then prune and quantize this network, before storing its weights as a compressed sparse array.
-                    Althoughrepresented sequentially,
-                    we may choose to perform some of these steps jointly with training, e.g. directly train sparseMLPs
+                    Although represented sequentially,
+                    we may choose to perform some of these steps jointly with training, e.g. directly train sparse MLPs
                     instead of pruning post-training.
-                    Given the rich body of literature in training neural networks efficiently, we baseour design choices
+                    Given the rich body of literature in training neural networks efficiently, we base our design
+                    choices
                     on empirical evaluation presented in this section.
                 </p>
                 <figure>
                     <image src="img/test_images.png" width="100%" height="100%" />
-                    <figcaption><b>Figure 2: Test images from the Image Compression Suite</b> ,chosen to include images
-                        that are JPEG compressible tovarying extents.
-                        The Image Compression Benchmark offers both 8-bit and 16-bit—as well as linear and tonemapped
+                    <figcaption><b>Figure 2: Test images from the Image Compression Suite</b>, chosen to include images
+                        that are JPEG compressible to varying extents.
+                        The Image Compression Benchmark offers both 8-bit and 16-bit—as well as linear and tone mapped
                         variants of test images—so we prefer it over the standard Kodak dataset (Franzen, 1999) for
-                        developing our method.
-                        However, when benchmarking the final method, we shall utilize the latter dataset.</figcaption>
+                        developing our method.</figcaption>
                 </figure>
                 <br>
                 <p>
@@ -286,9 +276,9 @@
                 <figure>
                     <image src="img/jpeg_psnr_size_vs_quality.png" width="100%" height="100%" />
                     <figcaption><b>Figure 3: JPEG performance in terms of PSNR and storage space versus quality, </b>
-                        evaluated on test images fromthe Image Compression Benchmark.
-                        PSNR is computed between the 8-bit uncompressed image and the JPEG encodedimage. Storage space
-                        is the actual space on disk in kilobytes, encoded using theOpenCVlibrary (Bradski, 2000).
+                        evaluated on test images from the Image Compression Benchmark.
+                        PSNR is computed between the 8-bit uncompressed image and the JPEG encoded image. Storage space
+                        is the actual space on disk in kilobytes, encoded using the OpenCVlibrary (Bradski, 2000).
                     </figcaption>
                 </figure>
                 <br>
@@ -301,51 +291,54 @@
                     While SIREN uses sinusoidal activation functions with a particular weight initialization, Fourier
                     Features—abreviated here as FFNet—uses a random Fourier embeddings (Rahimi and Recht, 2008)
                     to increase input dimensionsprior to a ReLU MLP. As seen in Figure 4, for a given number of
-                    parameters, SIREN significantly outperforms FFNetin image fitting.
+                    parameters, SIREN significantly outperforms FFNet in image fitting.
                 </p>
                 <figure>
                     <image src="img/width_depth.png" width="100%" height="100%" />
                     <figcaption><b>Figure 4: SIREN and FFNet compared across various width, depth configurations. </b>
                         We find SIREN (Sitzmannet al., 2020) to consistently outperform Fourier-Feature networks
-                        (FFNet, Tancik et al. (2020)) for all images andconfigurations. Increasing width and depth
-                        consistently improves performance for SIREN and less so for FFNet, butrequires greater
+                        (FFNet, Tancik et al. (2020)) for all images and configurations. Increasing width and depth
+                        consistently improves performance for SIREN and less so for FFNet, but requires greater
                         compression ratios.
-                        We set the map size of the random Fourier features as 256, with frequenciessampled fromN(0,σ=
+                        We set the map size of the random Fourier features as 256, with frequencies sampled from N(0,σ=
                         16).</figcaption>
                 </figure>
                 <br>
 
                 <p>
                     By considering the maximum PSNR (equivalently PSNR at quality 100) obtained by JPEG, we choose a
-                    SIRENnetwork with depth 8 (or 6 hidden layers) and width 128 as our baseline MLP.
-                    We also observe that the minimalarchitecture that outperforms JPEG in PSNR can differ across
-                    images—a hidden layer width of 256 units is better suitedfor thebigbuildingandbridgeimages.
-                    Table 1 summarises the architecture, performance and storage space forthe chosen baselines.
-                    The encoding time required per image is around 20 minutes (10,000 steps), while decoding timeis much
+                    SIREN network with depth 8 (or 6 hidden layers) and width 128 as our baseline MLP.
+                    We also observe that the minimal architecture that outperforms JPEG in PSNR can differ across
+                    images-a hidden layer width of 256 units is better suited for the bigbuilding and bridge images.
+                    Table 1 summarises the architecture, performance and storage space for the chosen baselines.
+                    The encoding time required per image is around 20 minutes (10,000 steps), while decoding time is
+                    much
                     smaller, around 30 milliseconds, all reported with a GPU device.
                 </p>
                 <p>
                     We compare four different techniques to reduce parameter count,
-                    viz.,Small-Dense,Feathermap,RigLandPruning.Small-Denseinvolves reducing the hidden-layer width
+                    viz., Small-Dense, Feathermap, RigL and Pruning. Small-Dense involves reducing the hidden-layer
+                    width
                     commensurately to achieve a target parameter count.
                     Feathermap is a recently proposed structured hashing technique that represents the entire weights
-                    and biases of the MLP by asingle matrix and then stores it via low-rank decomposition.
-                    Particularly, we findFeathermapto drastically hurt therepresentation power of the underlying SIREN
+                    and biases of the MLP by a single matrix and then stores it via low-rank decomposition.
+                    Particularly, we find Feathermap to drastically hurt the representation power of the underlying
+                    SIREN
                     network.
-                    Pruninghere refers to iterative pruning (Zhu and Gupta,2018), where low-magnitude weights are
-                    gradually removed from a fully-connected MLP till the desired sparsity isachieved.
+                    Pruning here refers to iterative pruning (Zhu and Gupta,2018), where low-magnitude weights are
+                    gradually removed from a fully-connected MLP till the desired sparsity is achieved.
                     RigL(Evci et al., 2020) instead directly trains sparse networks from scratch, with periodic growth,
-                    pruningand redistribution steps.
-                    Overall, we findRigLto be the best approach for lowering parameter-count without significantPSNR
+                    pruning and redistribution steps.
+                    Overall, we find RigL to be the best approach for lowering parameter-count without significant PSNR
                     loss (Figure 5).
                 </p>
                 <figure>
                     <image src="img/weight_removal.png" width="100%" height="100%" />
                     <figcaption><b>Figure 5: Weight compression techniques evaluated on test images. </b> We compare
-                        using a narrow hiddenlayer (akaSmall-Dense), structured hashing (Feathermap, Eban et al.
+                        using a narrow hidden layer (aka Small-Dense), structured hashing (Feathermap, Eban et al.
                         (2020)),
-                        iterative pruning (Pruning, Zhu and Gupta (2018))and dynamic-sparse training (RigL, Evci et al.
-                        (2020)).RigLoutperforms all other approaches, especially at highersparsities.
+                        iterative pruning (Pruning, Zhu and Gupta (2018)) and dynamic-sparse training (RigL, Evci et al.
+                        (2020)). RigL outperforms all other approaches, especially at higher sparsities.
                         Interestingly we can cut up to 80% of the original weights while incurring just a moderate drop
                         in PSNR.</figcaption>
                 </figure>
@@ -353,35 +346,26 @@
                 <br>
                 <p>
                     Low bit-rate via extreme sparsity. We qualitative illustrate the benefit of using sparse coordinate
-                    MLPs to achievecompression.
-                    As before, we useRigLto directly train sparse networks, but at much higher sparsity rates: 90%
-                    and95%, corresponding to a parameter count reduction of 10×and 20×respectively.
-                    By shifting toint8quantization,which reduces bits required by4xand storing these weights in the
-                    Compressed Sparse Column (CSC) format, we canevaluate the theoretical bit-rates.
+                    MLPs to achieve compression.
+                    As before, we use RigL to directly train sparse networks, but at much higher sparsity rates: 90%
+                    and 95%, corresponding to a parameter count reduction of 10× and 20× respectively.
+                    By shifting to int8 quantization, which reduces bits required by 4x, we can evaluate the theoretical
+                    bit-rates.
                     As seen in Figure 6, even at high compression ratios, our approach retains most ofthe visual
                     structure and does not suffer from block artefacts.
                 </p>
-                <figure>
-                    <image src="img/low_bit_rate_case.png" width="100%" height="100%" />
-                    <figcaption><b>Figure 6: Qualitative comparison of JPEG versus our method in the low bit-rate
-                            regime. </b> Unlike JPEG, the proposed approach does not lead to any blockartefacts
-                        under severe compression. Compression ratios for our method are estimated, assuming weight
-                        reduction usingRigLandint8quantization—withoutany entropy coding.
-                        Quantization produces a fixed compression of4×, whilesparsity is used as a toggle to achieve the
-                        target bit-rates. Zoom in to see details.</figcaption>
-                </figure>
                 <br>
                 <p>
                     Wavelet Fitting. We attempt to increase the representation capacity of coordinate MLPs via wavelet
                     decomposition.
-                    We use the Daubechies-3 wavelet to perform decompose an image and fit a MLP each to low-frequency
-                    and high-frequency components—bothjointly optimized from scratch.
+                    We use the Daubechies-3 wavelet to decompose an image and fit a MLP each to low-frequency
+                    and high-frequency components—both jointly optimized from scratch.
                     For RGB images, we predict low-frequency outputs in the YCbCr space and then simply upsample the
                     chroma components.
-                    Unfortunately, this approach does not confer any benefit over directly fitting animage (Figure 7).
+                    Unfortunately, this approach does not confer any benefit over directly fitting an image (Figure 7).
                 </p>
                 <figure>
-                    <image src="img/wavelet_comparison.png" width="100%" height="100%" />
+                    <image src="img/wavelet_comparison.png" width="75%" height="75%" />
                     <figcaption><b>Figure 7: Wavelet decompositiondoes not improve performance.</b> For a fair
                         comparison,
                         we use thesame overall parameter count in either approach. At the parametercounts considered,
@@ -390,31 +374,85 @@
                 <br>
                 <p>
                     Weight Quantization. Training with half precision (float16) or with surrogate quantization modules
-                    that simulate int8 precision can reducethe possible performance drop due to post-training
+                    that simulate int8 precision can reduce the possible performance drop due to post-training
                     quantization,
-                    while still maintaining full precision (float32) PSNR.Amongst post-training quantization techniques,
-                    we shall consider k-means or centroid based clustering, range basedquantization and distribution
+                    while still maintaining full precision (float32) PSNR. Amongst post-training quantization
+                    techniques,
+                    we shall consider k-means or centroid based clustering, range based quantization and distribution
                     based quantization.
                     Han et al. (2015) finds that in the image-classification domain, fully-connected layers can be
-                    represented with just 5-bits—although we expect more bits (6-8) required for the significantlyharder
+                    represented with just 5-bits—although we expect more bits (6-8) required for the significantly
+                    harder
                     image-fitting problem.
-                    Yet another alternative is to use the SZ lossy algorithm (Di and Cappello, 2016), althoughthis can
+                    Yet another alternative is to use the SZ lossy algorithm (Di and Cappello, 2016), although this can
                     be harder to implement (lots of carefully crafted stages, not widely supported).
                 </p>
                 <p>
                     Post pruning and quantization, we are left with a bunch of sparse matrices that need to be
                     efficiently stored.
-                    We shalluse the Compressed Sparse Columns (CSC) format, which stores2η(n×m) +m+ 1numbers for a
-                    matrix of sizen×mand sparsityη.
                     We note that since no pruning is performed on the bias vectors, these can be represented as
-                    densearrays.
+                    dense arrays.
                     The stored matrices can now be compressed by a combination of common entropy coding techniques such
-                    ashuffman encoding, LZ77 or the more recent proposed ZStandard.
+                    as huffman encoding, LZ77 or the more recent proposed ZStandard. We found ZStandard to be most
+                    effective.
                 </p>
 
                 </ul>
             </div>
         </div>
+
+        <div class="row">
+            <div class="col-md-8 col-md-offset-2">
+                <h3>
+                    Results
+                </h3>
+                <br>
+                <p>
+                    Here we compare our method against three existing codecs: JPEG, JPEG2000, and Webp. On natural
+                    images,
+                    we match or exceed the performance of JPEG2000 but do worse than Webp.
+                </p>
+                <figure>
+                    <image src="img/rate_distortion_curve_natural.png" width="65%" height="65%" />
+                    <figcaption><b>Figure 8: </b></figcaption>
+                </figure>
+                <p>
+                    To demostrate the benefit of learnt represntations we consider images which are comprised mostly of
+                    text.
+                    JPEG and JPEG2000 are not designed for this domain and perform poorly. Despite having a pipeline
+                    to JPEG, our learnt representtations better perserves teh high frequency components and outperforms
+                    the other approaches.
+
+                <figure>
+                    <image src="img/rate_distortion_curve_text.png" width="65%" height="65%" />
+                    <figcaption><b>Figure 9: </b></figcaption>
+                </figure>
+
+                <p>
+                    Here are some qualitative results in the low-bit rate regime. On the top row we compress the raw
+                    image by 150 times
+                    and on the bottom row by 80 times. Evaluated on PSNR, our method outperforms both JPEG variants, but
+                    falls short of Webp.
+
+                    We can also see block artifacts in both JPG and Webp since these are block compression methods. In
+                    contrast, JPEG2000 only
+                    contains ringing artifacts, as seen as blur and rings near the edges. Our approach does not have any
+                    of these major artifacts,
+                    but loses out on high-frequency detail at high compression rates.
+                </p>
+                <figure>
+                    <image src="img/low_bit_rate.png" width="100%" height="100%" />
+                    <figcaption><b>Figure 10: </b> Unlike JPEG and Webp, the proposed approach does not lead to any
+                        block artefacts
+                        under severe compression.</figcaption>
+                </figure>
+
+                </ul>
+            </div>
+        </div>
+
+
+
 
         <div class="row">
             <div class="col-md-8 col-md-offset-2">
