@@ -92,25 +92,25 @@
                     <li>
                         <a href="docs/proposal.pdf">
                             <image src="img/ff_paper_proposal.png" height="60px">
-                                <h4><strong>Proposal</strong></h4>
+                                <b><strong>Proposal</strong>.</b>
                         </a>
                     </li>
                     <li>
                         <a href="docs/mid_term.pdf">
                             <image src="img/ff_paper_mid_term.png" height="60px">
-                                <h4><strong>Midterm</strong></h4>
+                                <b><strong>Midterm</strong>.</b>
                         </a>
                     </li>
                     <li>
                         <a href="https://github.com/varun19299/implicit-image-compression">
                             <image src="img/github.png" height="60px">
-                                <h4><strong>Code</strong></h4>
+                                <b><strong>Code</strong>.</b>
                         </a>
                     </li>
                     <li>
                         <a href="https://wandb.ai/implicit-image">
                             <image src="img/wandb.png" height="60px">
-                                <h4><strong>Plots</strong></h4>
+                                <b><strong>Plots</strong>.</b>
                         </a>
                     </li>
                 </ul>
@@ -127,15 +127,21 @@
                 Implicit Neural Networks, being a continuous mapping, can serve as a compelling choice for representing
                 a variety of commonly encountered 2D and 3D signals.
                 In this project, we specifically consider the task of image compression via implicit networks.
-                Unfortunately, owing to the over-parameterized nature of deep networks, a naive approach may require
+                Owing to the over-parameterized nature of deep networks, a MLP may require
                 more
                 parameters than samples present in the original signal.
                 Furthermore, the capacity of such networks often saturates with increasing width or depth.
-                We explored two related directions: (a) efficiently increasing the capacity of implicit MLPs to fit
+
+                </br>
+                </br>
+
+                We explore two related directions: (a) efficiently increasing the capacity of implicit MLPs to fit
                 natural images, and
-                (b) reducing the storage requirement of such networks through a combination of structured hashing,
+                (b) reducing the storage requirement of such networks through a combination of sparsity,
                 quantization and entropy coding.
                 <br>
+                </br>
+
                 <figure>
                     <image src="img/idea.png" width="800px" height="350px" />
                     <figcaption><b>Method overview.</b> We propose to use a pipeline similar to JPEG with two major
@@ -229,6 +235,7 @@
                         quality is usually sacrificed for storage space, we are interested in exploring the trade-off
                         space for coordinate MLPs and comparing them to conventionally used image compression algorithms
                         such as JPEG.</li>
+                    <br>
                     <li>For a fixed number of network parameters, can image decomposition help overcome the diminishing
                         returns of naively scaling coordinate MLPs? Valuable insights could include understanding when
                         such decompositions are useful and the range of image resolutions that can be represented.</li>
@@ -274,7 +281,7 @@
                     GPU with 8GB of VRAM.
                 </p>
                 <figure>
-                    <image src="img/jpeg_psnr_size_vs_quality.png" width="100%" height="100%" />
+                    <image src="img/jpeg_psnr_size_vs_quality.png" class="img-responsive" alt="overview" />
                     <figcaption><b>Figure 3: JPEG performance in terms of PSNR and storage space versus quality, </b>
                         evaluated on test images from the Image Compression Benchmark.
                         PSNR is computed between the 8-bit uncompressed image and the JPEG encoded image. Storage space
@@ -285,7 +292,8 @@
 
 
                 <p>
-                    Network Architecture. We compare two recently proposed architectures for enabling MLPs to better
+                    <b>Network Architecture.</b> We compare two recently proposed architectures for enabling MLPs to
+                    better
                     represent high-frequency detail in low-dimensional problems: SIREN (Sitzmann et al., 2020) and
                     Fourier Features (Tancik et al.,2020).
                     While SIREN uses sinusoidal activation functions with a particular weight initialization, Fourier
@@ -333,7 +341,7 @@
                     loss (Figure 5).
                 </p>
                 <figure>
-                    <image src="img/weight_removal.png" width="100%" height="100%" />
+                    <image src="img/weight_removal.png" class="img-responsive center-block" />
                     <figcaption><b>Figure 5: Weight compression techniques evaluated on test images. </b> We compare
                         using a narrow hidden layer (aka Small-Dense), structured hashing (Feathermap, Eban et al.
                         (2020)),
@@ -345,7 +353,8 @@
 
                 <br>
                 <p>
-                    Low bit-rate via extreme sparsity. We qualitative illustrate the benefit of using sparse coordinate
+                    <b>Low bit-rate via extreme sparsity.</b> We qualitative illustrate the benefit of using sparse
+                    coordinate
                     MLPs to achieve compression.
                     As before, we use RigL to directly train sparse networks, but at much higher sparsity rates: 90%
                     and 95%, corresponding to a parameter count reduction of 10× and 20× respectively.
@@ -356,7 +365,8 @@
                 </p>
                 <br>
                 <p>
-                    Wavelet Fitting. We attempt to increase the representation capacity of coordinate MLPs via wavelet
+                    <b>Wavelet Fitting.</b> We attempt to increase the representation capacity of coordinate MLPs via
+                    wavelet
                     decomposition.
                     We use the Daubechies-3 wavelet to decompose an image and fit a MLP each to low-frequency
                     and high-frequency components—both jointly optimized from scratch.
@@ -365,7 +375,8 @@
                     Unfortunately, this approach does not confer any benefit over directly fitting an image (Figure 7).
                 </p>
                 <figure>
-                    <image src="img/wavelet_comparison.png" width="75%" height="75%" />
+                    <image src="img/wavelet_comparison.png" class="img-responsive center-block" alt="overview"
+                        width="60%" />
                     <figcaption><b>Figure 7: Wavelet decompositiondoes not improve performance.</b> For a fair
                         comparison,
                         we use thesame overall parameter count in either approach. At the parametercounts considered,
@@ -373,7 +384,8 @@
                 </figure>
                 <br>
                 <p>
-                    Weight Quantization. Training with half precision (float16) or with surrogate quantization modules
+                    <b>Weight Quantization.</b> Training with half precision (float16) or with surrogate quantization
+                    modules
                     that simulate int8 precision can reduce the possible performance drop due to post-training
                     quantization,
                     while still maintaining full precision (float32) PSNR. Amongst post-training quantization
@@ -388,6 +400,7 @@
                     be harder to implement (lots of carefully crafted stages, not widely supported).
                 </p>
                 <p>
+                    <b>Entropy Coding.</b>
                     Post pruning and quantization, we are left with a bunch of sparse matrices that need to be
                     efficiently stored.
                     We note that since no pruning is performed on the bias vectors, these can be represented as
@@ -413,9 +426,12 @@
                     we match or exceed the performance of JPEG2000 but do worse than Webp.
                 </p>
                 <figure>
-                    <image src="img/rate_distortion_curve_natural.png" width="65%" height="65%" />
-                    <figcaption><b>Figure 8: </b></figcaption>
+                    <image src="img/rate_distortion_curve_natural.png" class="img-responsive center-block"
+                        alt="overview" />
+                    <figcaption><b>Figure 8: Rate distortion curve evaluated on natural images.</b></figcaption>
                 </figure>
+                </br>
+
                 <p>
                     To demostrate the benefit of learnt represntations we consider images which are comprised mostly of
                     text.
@@ -424,10 +440,10 @@
                     the other approaches.
 
                 <figure>
-                    <image src="img/rate_distortion_curve_text.png" width="65%" height="65%" />
-                    <figcaption><b>Figure 9: </b></figcaption>
+                    <image src="img/rate_distortion_curve_text.png" class="img-responsive center-block" />
+                    <figcaption><b>Figure 9: Rate distortion curve evaluated on text images.</b></figcaption>
                 </figure>
-
+                </br>
                 <p>
                     Here are some qualitative results in the low-bit rate regime. On the top row we compress the raw
                     image by 150 times
@@ -452,8 +468,6 @@
         </div>
 
 
-
-
         <div class="row">
             <div class="col-md-8 col-md-offset-2">
                 <h3>
@@ -462,6 +476,106 @@
                 <p class="text-justify">
                     This website template was borrowed from <a href="http://mgharbi.com/">Michaël Gharbi</a> and
                     <a href="https://www.matthewtancik.com">Matthew Tannick</a>.
+                </p>
+            </div>
+        </div>
+
+        <div class="small">
+            <div class="col-md-8 col-md-offset-2">
+                <h3>
+                    References
+                </h3>
+                <p class="text-justify">
+                    G. Bradski. The OpenCV Library. Dr. Dobb’s Journal of Software Tools, 2000.
+                    <br>
+                    <br>
+
+                    E. Chan, M. Monteiro, P. Kellnhofer, J. Wu, and G. Wetzstein. pi-gan: Periodic implicit generative
+                    adversarial networks
+                    for 3d-aware image synthesis. In arXiv, 2020.
+                    <br>
+                    <br>
+
+                    S. Di and F. Cappello. Fast error-bounded lossy hpc data compression with sz. In 2016 ieee
+                    international parallel and
+                    distributed processing symposium (ipdps), pages 730–739. IEEE, 2016.
+                    <br>
+                    <br>
+
+                    E. Eban, Y. Movshovitz-Attias, H. Wu, M. Sandler, A. Poon, Y. Idelbayev, and M. A.
+                    Carreira-Perpinan. Structured multi-hashing for model compression. In Proceedings of the IEEE/CVF
+                    Conference on Computer Vision and Pattern Recognition (CVPR), June 2020.
+                    <br>
+                    <br>
+
+                    U. Evci, T. Gale, J. Menick, P. S. Castro, and E. Elsen. Rigging the lottery: Making all tickets
+                    winners. In Proceedings of Machine Learning and Systems (ICML), July 2020.
+                    <br>
+                    <br>
+
+                    R. Franzen. Kodak lossless true color image suite. 1999.
+                    <br>
+                    <br>
+
+                    S. Han, H. Mao, and W. J. Dally. Deep compression: Compressing deep neural networks with pruning,
+                    trained quan- tization and huffman coding. In Proceedings of the International Conference on
+                    Learning Representations (ICLR), April 2015.
+                    <br>
+                    <br>
+
+                    Y.-L. Liu, W.-S. Lai, M.-H. Yang, Y.-Y. Chuang, and J.-B. Huang. Neural re-rendering for full-frame
+                    video stabilization. In arXiv, 2021.
+                    <br>
+                    <br>
+
+                    I. Loshchilov and F. Hutter. Decoupled weight decay regularization. In International Conference on
+                    Learning Repre- sentations, April 2019.
+                    <br>
+                    <br>
+
+                    R. Martin-Brualla, N. Radwan, M. S. Sajjadi, J. T. Barron, A. Dosovitskiy, and D. Duckworth. Nerf in
+                    the wild: Neural radiance fields for unconstrained photo collections. 2020.
+                    <br>
+                    <br>
+
+                    B. Mildenhall, P. P. Srinivasan, M. Tancik, J. T. Barron, R. Ramamoorthi, and R. Ng. Nerf:
+                    Representing scenes as neural radiance fields for view synthesis. In Proceedings of the European
+                    Conference on Computer Vision (ECCV), September 2020.
+                    <br>
+                    <br>
+
+                    A. Rahimi and B. Recht. Random features for large-scale kernel machines. In Advances in Neural
+                    Information Pro- cessing Systems, December 2008.
+                    <br>
+                    <br>
+
+                    D. Rebain, W. Jiang, S. Yazdani, K. Li, K. M. Yi, and A. Tagliasacchi. Derf: Decomposed radiance
+                    fields. 2020.
+                    <br>
+                    <br>
+
+                    K. Schwarz, Y. Liao, M. Niemeyer, and A. Geiger. Graf: Generative radiance fields for 3d-aware image
+                    synthesis. In
+                    Advances in Neural Information Processing Systems (NeurIPS), 2020.
+                    <br>
+                    <br>
+
+                    V. Sitzmann, J. N. Martel, A. W. Bergman, D. B. Lindell, and G. Wetzstein. Implicit neural
+                    representations with
+                    periodic activation functions. 2020.
+                    <br>
+                    <br>
+
+                    M. Tancik, P. P. Srinivasan, B. Mildenhall, S. Fridovich-Keil, N. Raghavan, U. Singhal, R.
+                    Ramamoorthi, J. T. Barron, and R. Ng. Fourier features let networks learn high frequency functions
+                    in low dimensional domains. 2020.
+                    <br>
+                    <br>
+
+                    M. Zhu and S. Gupta. To prune, or not to prune: Exploring the efficacy of pruning for model
+                    compression. In Proceedings of the International Conference on Learning Representations (ICLR),
+                    April 2018.
+
                 </p>
             </div>
         </div>

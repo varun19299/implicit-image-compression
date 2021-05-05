@@ -28,8 +28,9 @@
 
 figure figcaption {
 	/* border: 1px dotted blue; */
-	font-size: .9em;
+	font-size: .95em;
     text-align: center;
+	color: midnightblue;
 }
 
 .card {
@@ -64,4 +65,12 @@ textarea.textarea-autosize.form-control-lg {
 textarea.textarea-autosize.form-control-sm {
   height: 2rem;
   min-height: 2rem;
+}
+
+div.row {
+	font-size: 18px;
+}
+
+div.small {
+	font-size: 14px;
 }
